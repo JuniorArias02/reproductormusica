@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fondo: #0A0A0C;
+  --color-superficie: #141417;
+  --color-acento-primario: #FF4A1C;
+  --color-acento-secundario: #00F0FF;
+  --color-texto-principal: #F4F4F5;
+  --color-texto-secundario: #A1A1AA;
+
+  --animate-girar-vinilo: girar 10s linear infinite;
+
+  @keyframes girar {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-fondo);
+  color: var(--color-texto-principal);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ─── Scrollbar personalizado ───────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2A2A2E; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3A3A3E; }
+
+/* ─── Animación de Morph: ripple que sale de la tarjeta ────── */
+@keyframes morphRipple {
+  0%   { transform: scale(0); border-radius: 50%; opacity: 1; }
+  60%  { transform: scale(1); border-radius: 30%; opacity: 1; }
+  100% { transform: scale(1); border-radius: 0%;  opacity: 1; }
+}
+.morph-ripple {
+  animation: morphRipple 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ─── Panel Now Playing: entra desde derecha ────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.panel-now-playing {
+  animation: slideInRight 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ─── Listado compacto: entra desde izquierda ───────────────── */
+@keyframes slideInLeft {
+  from { transform: translateX(-40px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.lista-compacta {
+  animation: slideInLeft 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ─── Item fila de lista: entrada escalonada ─────────────────── */
+@keyframes fadeSlideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.fila-cancion {
+  animation: fadeSlideUp 0.4s ease forwards;
+  opacity: 0;
+}
+
+/* ─── Vinilo 3D gira ─────────────────────────────────────────── */
+@keyframes vinilGirar {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.vinil-girar {
+  animation: vinilGirar 8s linear infinite;
+}
+
+/* ─── Pulso del glow ─────────────────────────────────────────── */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 30px rgba(255,74,28,0.25), 0 0 60px rgba(255,74,28,0.1); }
+  50%       { box-shadow: 0 0 60px rgba(255,74,28,0.5), 0 0 100px rgba(255,74,28,0.2); }
+}
+.glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* ─── Barra visualizador ─────────────────────────────────────── */
+@keyframes visualBar1 { 0%,100%{height:20%} 50%{height:90%} }
+@keyframes visualBar2 { 0%,100%{height:50%} 50%{height:30%} }
+@keyframes visualBar3 { 0%,100%{height:80%} 50%{height:60%} }
+@keyframes visualBar4 { 0%,100%{height:30%} 50%{height:100%} }
+@keyframes visualBar5 { 0%,100%{height:60%} 50%{height:20%} }
+@keyframes visualBar6 { 0%,100%{height:40%} 50%{height:80%} }
+@keyframes visualBar7 { 0%,100%{height:70%} 50%{height:40%} }
+
+/* ─── Entrada del texto Now Playing ─────────────────────────── */
+@keyframes textReveal {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.text-reveal-1 { animation: textReveal 0.5s 0.3s ease forwards; opacity: 0; }
+.text-reveal-2 { animation: textReveal 0.5s 0.45s ease forwards; opacity: 0; }
+.text-reveal-3 { animation: textReveal 0.5s 0.6s ease forwards; opacity: 0; }
+.text-reveal-4 { animation: textReveal 0.5s 0.75s ease forwards; opacity: 0; }
