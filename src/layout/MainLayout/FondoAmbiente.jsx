@@ -104,6 +104,36 @@ export function FondoAmbiente() {
       ctx.globalCompositeOperation = 'screen';
       const cx = W * 0.5, cy = H * 0.5;
 
+      // ---- OPTIMIZACIÓN: Caché de texturas de Blobs ----
+      if (!s.cacheCanvas) {
+        s.cacheCanvas = document.createElement('canvas');
+        s.cacheCanvas.width = 256;
+        s.cacheCanvas.height = 256;
+        s.cacheCtx = s.cacheCanvas.getContext('2d', { alpha: true });
+        
+        s.cyanCanvas = document.createElement('canvas');
+        s.cyanCanvas.width = 256;
+        s.cyanCanvas.height = 256;
+        const cyanCtx = s.cyanCanvas.getContext('2d', { alpha: true });
+        const gC = cyanCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        gC.addColorStop(0, 'rgba(0,240,255,0.8)');
+        gC.addColorStop(1, 'rgba(0,240,255,0)');
+        cyanCtx.fillStyle = gC;
+        cyanCtx.fillRect(0, 0, 256, 256);
+      }
+
+      // Solo actualizar la textura si el color cambió significativamente
+      if (s.lastR !== R || s.lastG !== G || s.lastB !== B) {
+        s.cacheCtx.clearRect(0, 0, 256, 256);
+        const grad = s.cacheCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        grad.addColorStop(0, `rgba(${R},${G},${B},1)`);
+        grad.addColorStop(0.5, `rgba(${R},${G},${B},0.5)`);
+        grad.addColorStop(1, `rgba(${R},${G},${B},0)`);
+        s.cacheCtx.fillStyle = grad;
+        s.cacheCtx.fillRect(0, 0, 256, 256);
+        s.lastR = R; s.lastG = G; s.lastB = B;
+      }
+
       // ── Blobs nebulosos orbitales ────────────────────────────
       s.blobs.forEach((blob) => {
         blob.angulo += blob.velocidad * dt;
@@ -114,28 +144,17 @@ export function FondoAmbiente() {
         const radio = blob.tamano * Math.min(W, H) * factorLatido;
         const alpha = 0.035 + Math.abs(Math.sin(blob.faseAlpha)) * 0.04;
 
-        const grad = ctx.createRadialGradient(bx, by, 0, bx, by, radio);
-        grad.addColorStop(0, `rgba(${R},${G},${B},${(alpha * 1.8).toFixed(3)})`);
-        grad.addColorStop(0.5, `rgba(${R},${G},${B},${(alpha * 0.5).toFixed(3)})`);
-        grad.addColorStop(1, `rgba(${R},${G},${B},0)`);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(bx, by, radio, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = alpha * 1.8;
+        ctx.drawImage(s.cacheCanvas, bx - radio, by - radio, radio * 2, radio * 2);
       });
 
       // Blob cian complementario (se mueve en sentido contrario)
       const bCx = cx + Math.cos(s.t * 0.00007) * W * 0.28;
       const bCy = cy + Math.sin(s.t * 0.00004) * H * 0.28;
       const bCR = Math.min(W, H) * 0.18;
-      const gC = ctx.createRadialGradient(bCx, bCy, 0, bCx, bCy, bCR);
-      gC.addColorStop(0, 'rgba(0,240,255,0.04)');
-      gC.addColorStop(1, 'rgba(0,240,255,0)');
-      ctx.fillStyle = gC;
-      ctx.beginPath();
-      ctx.arc(bCx, bCy, bCR, 0, Math.PI * 2);
-      ctx.fill();
-
+      ctx.globalAlpha = 0.04;
+      ctx.drawImage(s.cyanCanvas, bCx - bCR, bCy - bCR, bCR * 2, bCR * 2);
+      
       // ── Campo de estrellas (arcos simples sin gradientes) ─────
       const est = s.estrellas;
       ctx.fillStyle = 'rgba(220,220,240,1)';

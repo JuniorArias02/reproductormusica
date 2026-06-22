@@ -1,5 +1,5 @@
 import { useReproductor } from '../../Player/context/ContextoReproductor';
-import { Play, Pause, Heart, Clock, Music } from 'lucide-react';
+import { Play, Pause, Heart, Clock, Music, Film } from 'lucide-react';
 import { cn } from '../../../utils/clases';
 
 export function Libreria() {
@@ -121,11 +121,9 @@ export function Libreria() {
                   >
                     {cancion.portada ? (
                       <img src={cancion.portada} className="w-full h-full object-cover" alt="cover" />
-                    ) : cancion.esVideo ? (
-                      <video src={cancion.archivo} className="w-full h-full object-cover opacity-60" muted autoPlay loop playsInline />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 border border-zinc-700/30">
-                        <Music size={16} className="text-zinc-500" />
+                        {cancion.esVideo ? <Film size={16} className="text-zinc-500" /> : <Music size={16} className="text-zinc-500" />}
                       </div>
                     )}
                   </div>

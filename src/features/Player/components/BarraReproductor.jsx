@@ -34,18 +34,6 @@ export function BarraReproductor() {
     cerrarPanel,
   } = useReproductor();
 
-  // Elemento multimedia real (siempre montado, fuera de la barra visual)
-  const elementoMedia = (
-    <video
-      ref={refElemento}
-      className="hidden"
-      loop={repitiendo}
-      onEnded={siguienteCancion}
-      onTimeUpdate={manejarActualizacionTiempo}
-      onLoadedMetadata={manejarMetadatosCargados}
-    />
-  );
-
   const R = color?.r ?? 255, G = color?.g ?? 74, B = color?.b ?? 28;
   const hex = color?.hex ?? '#FF4A1C';
   const rgba = (a) => `rgba(${R},${G},${B},${a})`;
@@ -54,11 +42,9 @@ export function BarraReproductor() {
 
   return (
     <>
-      {elementoMedia}
-
       <div
         className="w-full flex-shrink-0 relative overflow-hidden transition-all duration-700"
-        style={{ height: cancionActual ? '88px' : '0px' }}
+        style={{ height: cancionActual && !panelExpandido ? '88px' : '0px' }}
       >
         {/* Fondo glassmorphic con tinte de color */}
         <div
@@ -106,10 +92,10 @@ export function BarraReproductor() {
                     background: `radial-gradient(circle, ${rgba(0.3)} 0%, #1A1A1E 60%)`,
                   }}
                 >
-                  {cancionActual.esVideo ? (
-                    <video src={cancionActual.archivo} className="absolute inset-0 w-full h-full object-cover opacity-70" muted autoPlay loop playsInline />
-                  ) : cancionActual.portada ? (
+                  {cancionActual.portada ? (
                     <img src={cancionActual.portada} className="absolute inset-0 w-full h-full object-cover opacity-70" alt="Cover" />
+                  ) : cancionActual.esVideo ? (
+                    <div className="absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900 opacity-60" />
                   ) : null}
                   {/* Surcos */}
                   <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, transparent 30%, rgba(0,0,0,0.5) 100%)' }} />
