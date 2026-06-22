@@ -4,18 +4,21 @@ import { useReproductor } from '../../features/Player/context/ContextoReproducto
 const CANTIDAD_ESTRELLAS = 120;
 const CANTIDAD_BLOBS = 4;
 const PASO_ESTRELLA = 0.018;
+const MAX_SHOCKWAVES = 8; // Pool máximo de ondas simultáneas
 
 /**
- * Canvas full-screen de fondo — Motor de animación Multi-Banda.
- * Cada frecuencia controla un elemento visual distinto:
- *   BAJOS  → Tamaño + flash de burbujas nebulosas (bombo/kick)
- *   MEDIOS → Velocidad orbital de las burbujas + blob cian (voz/guitarras)
- *   ALTOS  → Brillo, velocidad y tamaño de las estrellas (hi-hats/platillos)
+ * Canvas full-screen de fondo — Motor de animación Multi-Banda v3.
+ *   BAJOS      → Tamaño + flash de burbujas + SHOCKWAVE RINGS (bombo/kick)
+ *   MEDIOS     → Velocidad orbital + blob cian (voz/guitarras/piano)
+ *   ALTOS      → Brillo, velocidad y tamaño de estrellas (hi-hats/platillos)
+ *   ENERGÍA    → Orbe central respiratorio + Vignette pulsante
+ *   TRANSIENTE → Detección de golpe seco → dispara shockwave y vignette
  */
 export function FondoAmbiente() {
   const { color, estaReproduciendo, obtenerBandas } = useReproductor();
   const refCanvas = useRef(null);
   const refRaf = useRef(null);
+  const refVignette = useRef(null);
   const sis = useRef(null);
 
   if (!sis.current) {
@@ -34,18 +37,30 @@ export function FondoAmbiente() {
       angulo: (Math.PI * 2 / CANTIDAD_BLOBS) * i,
       radioOrbit: 0.14 + Math.random() * 0.20,
       velocidad: (0.00010 + Math.random() * 0.00006) * (i % 2 === 0 ? 1 : -1),
-      tamano: 0.12 + Math.random() * 0.08, // pequeños en reposo
+      tamano: 0.12 + Math.random() * 0.08,
       faseAlpha: Math.random() * Math.PI * 2,
     }));
 
+    // Pool de shockwaves — evita allocaciones en el bucle caliente
+    const shockwaves = Array.from({ length: MAX_SHOCKWAVES }, () => ({
+      activo: false, radio: 0, maxRadio: 0, alpha: 0,
+      r: 255, g: 74, b: 28,
+    }));
+
     sis.current = {
-      estrellas, blobs,
+      estrellas, blobs, shockwaves,
       cr: 255, cg: 74, cb: 28,
       tr: 255, tg: 74, tb: 28,
       t: 0,
       reproduciendo: false,
       // Envelopes independientes por banda
       sBajos: 0, sMedios: 0, sAltos: 0,
+      // Para detección de transiente: valor previo de rawBajos
+      prevBajos: 0,
+      // Vignette pulsante
+      vignetteAlpha: 0,
+      // Orbe central
+      orbeAlpha: 0,
     };
   }
 
@@ -74,7 +89,17 @@ export function FondoAmbiente() {
     const ctx = canvas.getContext('2d');
     let ultimo = performance.now();
 
-    const bucle = (ahora) => {
+    const dispararShockwave = (s, cx, cy, R, G, B, W) => {
+      const libre = s.shockwaves.find(sw => !sw.activo);
+      if (!libre) return;
+      libre.activo = true;
+      libre.radio = 0;
+      libre.maxRadio = Math.min(W, window.innerHeight) * (0.25 + Math.random() * 0.35);
+      libre.alpha = 0.7;
+      libre.r = R; libre.g = G; libre.b = B;
+    };
+
+    const bucle = (ahora) => { try {
       const dt = Math.min(ahora - ultimo, 33);
       ultimo = ahora;
       const s = sis.current;
@@ -83,7 +108,6 @@ export function FondoAmbiente() {
       ctx.clearRect(0, 0, W, H);
 
       // ── Análisis multi-banda ─────────────────────────────────────────
-      // 3 señales independientes. Cada una tiene su propio envelope A/D.
       let rawBajos = 0, rawMedios = 0, rawAltos = 0;
       if (s.reproduciendo && obtenerBandas) {
         const bands = obtenerBandas();
@@ -94,15 +118,25 @@ export function FondoAmbiente() {
         }
       }
 
-      // Fast Attack / Slow Decay — permite distinguir la "textura" de cada instrumento
-      // BAJOS: ataque brutal (0.80), decay elástico (0.06) → efecto membrana de bombo
+      // Fast Attack / Slow Decay independientes
       s.sBajos  += rawBajos  > s.sBajos  ? (rawBajos  - s.sBajos)  * 0.80 : (rawBajos  - s.sBajos)  * 0.06;
-      // MEDIOS: más orgánico (0.40/0.10) → la voz y guitarra fluyen
       s.sMedios += rawMedios > s.sMedios ? (rawMedios - s.sMedios) * 0.40 : (rawMedios - s.sMedios) * 0.10;
-      // ALTOS: muy reactivo (0.65/0.12) → chispa en cada hi-hat
       s.sAltos  += rawAltos  > s.sAltos  ? (rawAltos  - s.sAltos)  * 0.65 : (rawAltos  - s.sAltos)  * 0.12;
 
-      // El tiempo global se acelera con energía de medios y altos (no con bajos)
+      // ── Detección de Transiente (golpe de kick/bombo) ─────────────────
+      // Un transiente es cuando rawBajos sube repentinamente > 0.28 en un frame
+      const derivadaBajos = rawBajos - s.prevBajos;
+      if (derivadaBajos > 0.28 && rawBajos > 0.5) {
+        // ¡Golpe detectado! Disparar shockwave y vignette
+        dispararShockwave(s, W * 0.5, H * 0.5, s.cr | 0, s.cg | 0, s.cb | 0, W);
+        s.vignetteAlpha = Math.min(1, rawBajos * 0.9);
+      }
+      s.prevBajos = rawBajos;
+
+      // Decay del vignette
+      s.vignetteAlpha = Math.max(0, s.vignetteAlpha - dt * 0.008);
+
+      // El tiempo global se acelera con medios y altos
       s.t += dt * (1 + s.sMedios * 12 + s.sAltos * 5);
 
       s.cr += (s.tr - s.cr) * 0.02;
@@ -113,7 +147,7 @@ export function FondoAmbiente() {
       ctx.globalCompositeOperation = 'screen';
       const cx = W * 0.5, cy = H * 0.5;
 
-      // ── Caché de texturas de Blobs ────────────────────────────────────
+      // ── Caché de texturas ─────────────────────────────────────────────
       if (!s.cacheCanvas) {
         s.cacheCanvas = document.createElement('canvas');
         s.cacheCanvas.width = 256; s.cacheCanvas.height = 256;
@@ -140,36 +174,46 @@ export function FondoAmbiente() {
         s.lastR = R; s.lastG = G; s.lastB = B;
       }
 
+      // ── ORBE CENTRAL RESPIRATORIO (energía general) ───────────────────
+      // Siempre presente, más brillante con medios y altos, casi invisible en silencio
+      const energiaTotal = (s.sBajos * 0.3 + s.sMedios * 0.5 + s.sAltos * 0.2);
+      const orbeR = Math.min(W, H) * (0.06 + energiaTotal * 0.18);
+      const orbeAlpha = 0.025 + energiaTotal * 0.08;
+      
+      const orbeGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, orbeR);
+      orbeGrad.addColorStop(0, `rgba(${R},${G},${B},${orbeAlpha})`);
+      orbeGrad.addColorStop(0.5, `rgba(${R},${G},${B},${orbeAlpha * 0.4})`);
+      orbeGrad.addColorStop(1, `rgba(${R},${G},${B},0)`);
+      ctx.fillStyle = orbeGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbeR, 0, Math.PI * 2);
+      ctx.fill();
+
       // ── BLOBS → Controlados SOLO por BAJOS ───────────────────────────
-      // Reposo: pequeños y tenues. Drop/Bombo: explotan. Voz sola: no cambian tamaño.
       s.blobs.forEach((blob) => {
-        // La VELOCIDAD ORBITAL la controlan los MEDIOS (voz/guitarra/piano)
         blob.angulo += blob.velocidad * dt * (1 + s.sMedios * 10);
         blob.faseAlpha += 0.00035 * dt * (1 + s.sAltos * 3);
 
         const bx = cx + Math.cos(blob.angulo) * blob.radioOrbit * W;
         const by = cy + Math.sin(blob.angulo * 0.65) * blob.radioOrbit * H * 0.55;
 
-        // TAMAÑO: base 0.55, explota hasta 2.45 con los bajos (bombo/kick)
         const factorTamano = 0.55 + (s.sBajos * 1.9);
         const radio = blob.tamano * Math.min(W, H) * factorTamano;
 
-        // OPACIDAD: base orgánica + flash instantáneo del pico crudo de bajos
         const alphaBase = 0.03 + Math.abs(Math.sin(blob.faseAlpha)) * 0.04;
-        const alphaFlash = rawBajos * 0.55; // sin suavizar = flash estroboscópico real
+        const alphaFlash = rawBajos * 0.55;
         ctx.globalAlpha = Math.min((alphaBase + alphaFlash) * 2.2, 1);
         ctx.drawImage(s.cacheCanvas, bx - radio, by - radio, radio * 2, radio * 2);
       });
 
-      // ── BLOB CIAN → Responde a MEDIOS (voz/melodías) ────────────────
+      // ── BLOB CIAN → Medios (voz/melodías) ────────────────────────────
       const bCx = cx + Math.cos(s.t * 0.00007) * W * 0.28;
       const bCy = cy + Math.sin(s.t * 0.00004) * H * 0.28;
       const bCR = Math.min(W, H) * 0.14 * (1 + s.sMedios * 1.5);
       ctx.globalAlpha = 0.03 + (s.sMedios * 0.20);
       ctx.drawImage(s.cyanCanvas, bCx - bCR, bCy - bCR, bCR * 2, bCR * 2);
 
-      // ── ESTRELLAS → Controladas SOLO por ALTOS ───────────────────────
-      // Cada hi-hat, platillo, sibilancia vocal y rasgueo las enciende.
+      // ── ESTRELLAS → Altos (hi-hats, platillos, sibilancia) ──────────
       ctx.fillStyle = 'rgba(255,255,255,1)';
       const velocidadViaje = 1 + (Math.pow(rawAltos, 1.5) * 30);
       const est = s.estrellas;
@@ -185,31 +229,70 @@ export function FondoAmbiente() {
         if (est[b + 0] < 0) est[b + 0] = 1;
         if (est[b + 0] > 1) est[b + 0] = 0;
 
-        // Brillo: pico CRUDO de altos (sin suavizar) → chispas en cada hi-hat
         const alpha = (0.10 + Math.abs(Math.sin(est[b + 5])) * 0.4) + (rawAltos * 0.55);
         ctx.globalAlpha = Math.min(alpha, 1);
-
-        // Tamaño: suavizado para que no sea abrupto pero sí notorio
         const radioEstrella = est[b + 4] * (1 + s.sAltos * 2.0);
         ctx.beginPath();
         ctx.arc(est[b + 0] * W, est[b + 1] * H, radioEstrella, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.globalAlpha = 1;
+
+      // ── SHOCKWAVE RINGS (ondas de choque) ────────────────────────────
+      // Se expanden desde el centro y se desvanecen. Velocidad proporcional al kick.
+      const velocidadOnda = 0.3 + s.sBajos * 0.8; // px por ms
+      ctx.globalCompositeOperation = 'screen';
+      for (const sw of s.shockwaves) {
+        if (!sw.activo) continue;
+
+        sw.radio += velocidadOnda * dt;
+        sw.alpha -= 0.012 * dt * (1 / (sw.maxRadio / 200)); // decay proporcional al tamaño
+
+        if (sw.alpha <= 0 || sw.radio >= sw.maxRadio) {
+          sw.activo = false;
+          continue;
+        }
+
+        // Grosor del anillo decrece conforme se expande
+        const grosor = Math.max(1, 4 * (1 - sw.radio / sw.maxRadio));
+        ctx.beginPath();
+        ctx.arc(cx, cy, sw.radio, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${sw.r},${sw.g},${sw.b},${sw.alpha})`;
+        ctx.lineWidth = grosor;
+        ctx.stroke();
+      }
 
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
+
+      // Actualizar la vignette via el div CSS (no en el canvas para no interferir con mixBlendMode)
+      if (refVignette.current) {
+        refVignette.current.style.opacity = s.vignetteAlpha > 0.005 ? String(s.vignetteAlpha * 0.75) : '0';
+      }
       refRaf.current = requestAnimationFrame(bucle);
-    };
+    } catch(e) { console.error('FondoAmbiente error:', e); refRaf.current = requestAnimationFrame(bucle); } };
 
     refRaf.current = requestAnimationFrame(bucle);
     return () => cancelAnimationFrame(refRaf.current);
   }, []);
 
   return (
-    <canvas
-      ref={refCanvas}
-      className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: 0, willChange: 'transform', mixBlendMode: 'screen' }}
-    />
+    <>
+      <canvas
+        ref={refCanvas}
+        className="fixed inset-0 pointer-events-none"
+        style={{ zIndex: 0, willChange: 'transform', mixBlendMode: 'screen' }}
+      />
+      {/* Vignette pulsante en CSS para no interferir con mixBlendMode del canvas */}
+      <div
+        ref={refVignette}
+        className="fixed inset-0 pointer-events-none transition-opacity duration-75"
+        style={{
+          zIndex: 1,
+          opacity: 0,
+          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.85) 100%)',
+        }}
+      />
+    </>
   );
 }
