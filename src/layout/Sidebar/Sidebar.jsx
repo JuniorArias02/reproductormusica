@@ -95,32 +95,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Sección inferior: canción activa mini */}
-      {cancionActual && (
-        <div
-          className="m-3 p-3 rounded-xl relative z-10 overflow-hidden"
-          style={{
-            background: `rgba(${colorR},${colorG},${colorB},0.08)`,
-            border: `1px solid rgba(${colorR},${colorG},${colorB},0.2)`,
-          }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-widest mb-1"
-            style={{ color: `rgba(${colorR},${colorG},${colorB},0.8)` }}
-          >
-            Reproduciendo
-          </p>
-          <p className="text-xs font-semibold text-texto-principal truncate">{cancionActual.titulo}</p>
-          <p className="text-[11px] text-texto-secundario truncate">{cancionActual.artista}</p>
-
-          {/* Mini línea de progreso decorativa */}
-          <div className="mt-2 h-0.5 rounded-full bg-white/10 overflow-hidden">
-            <div
-              className="h-full rounded-full animate-[progress_3s_ease-in-out_infinite]"
-              style={{ background: colorHex, width: '40%' }}
-            />
-          </div>
-        </div>
-      )}
     </aside>
   );
 }

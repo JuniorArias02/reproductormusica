@@ -2,20 +2,13 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { BarraReproductor } from '../../features/Player/components/BarraReproductor';
 import { FondoAmbiente } from './FondoAmbiente';
+import { PanelNowPlaying } from '../../features/Player/components/PanelNowPlaying';
+import { useReproductor } from '../../features/Player/context/ContextoReproductor';
+import { cn } from '../../utils/clases';
 
-/**
- * Layout principal:
- * ┌──────────────────────────────────────┐
- * │ Sidebar │      Área de Contenido     │  ← flex-1, overflow-hidden, altura real
- * │         │                            │
- * ├──────────────────────────────────────┤
- * │        Barra de Reproductor          │  ← full-width
- * └──────────────────────────────────────┘
- *
- * overflow-hidden en main (no overflow-y-auto) para que h-full
- * en Inicio.jsx resuelva al tamaño real del contenedor.
- */
 export function MainLayout() {
+  const { panelExpandido, cancionActual } = useReproductor();
+
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden" style={{ background: '#0A0A0C' }}>
 
@@ -26,11 +19,24 @@ export function MainLayout() {
       <div className="relative z-10 flex flex-1 min-h-0">
         <Sidebar />
 
-        {/* main no tiene overflow-y-auto para que h-full funcione en Inicio */}
-        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className="flex-1 p-6 overflow-hidden">
+        {/* Contenedor dinámico (Main + Panel) */}
+        <main className="flex flex-1 min-w-0 overflow-hidden">
+          
+          {/* Vistas enrutadas (Inicio, Librería, Ajustes) */}
+          <div className={cn(
+            "flex-1 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] h-full",
+            panelExpandido && cancionActual ? "max-w-[45%] border-r border-white/5" : "max-w-full"
+          )}>
             <Outlet />
           </div>
+
+          {/* Panel Lateral Global (Now Playing) */}
+          {panelExpandido && cancionActual && (
+            <div className="flex-1 h-full overflow-hidden bg-black/10 backdrop-blur-sm transition-all duration-500 ease-in-out">
+              <PanelNowPlaying cancion={cancionActual} />
+            </div>
+          )}
+
         </main>
       </div>
 

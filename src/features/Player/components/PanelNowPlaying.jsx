@@ -1,4 +1,4 @@
-import { Play, Pause, SkipBack, SkipForward, Heart, Shuffle } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Heart, Shuffle, Repeat } from 'lucide-react';
 import { useReproductor } from '../context/ContextoReproductor';
 import { VisualizadorAudio } from './VisualizadorAudio';
 import { formatearTiempo } from '../utils/formatoTiempo';
@@ -16,6 +16,12 @@ export function PanelNowPlaying({ cancion }) {
     alternarReproduccion,
     cambiarTiempo,
     color,
+    mezclando,
+    repitiendo,
+    siguienteCancion,
+    cancionAnterior,
+    alternarMezcla,
+    alternarRepeticion
   } = useReproductor();
 
   const porcentaje = duracion ? (progreso / duracion) * 100 : 0;
@@ -109,13 +115,15 @@ export function PanelNowPlaying({ cancion }) {
 
             <div className="absolute inset-0 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900" />
 
-            {/* Portada: video como frame */}
+            {/* Portada: video o imagen */}
             {cancion?.esVideo ? (
               <video
                 src={cancion?.archivo}
                 className="absolute inset-0 w-full h-full object-cover opacity-80"
                 muted autoPlay loop playsInline
               />
+            ) : cancion?.portada ? (
+              <img src={cancion.portada} className="absolute inset-0 w-full h-full object-cover opacity-80" alt="Cover" />
             ) : (
               <div
                 className="absolute inset-0"
@@ -183,16 +191,31 @@ export function PanelNowPlaying({ cancion }) {
 
         {/* Controles */}
         <div className="text-reveal-4 flex items-center gap-6">
-          <button className="text-texto-secundario/40 cursor-not-allowed" title="Próximamente">
-            <Shuffle size={18} />
+          <button 
+            onClick={alternarMezcla}
+            className="transition-all hover:scale-110 active:scale-95" 
+            title="Mezclar"
+          >
+            <Shuffle 
+              size={18} 
+              style={{
+                color: mezclando ? hex : '#A1A1AA',
+                filter: mezclando ? `drop-shadow(0 0 5px ${hex})` : 'none',
+              }}
+            />
           </button>
-          <button className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 cursor-not-allowed">
+          
+          <button 
+            onClick={cancionAnterior}
+            className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 active:scale-95"
+            title="Anterior"
+          >
             <SkipBack size={22} />
           </button>
 
           <button
             onClick={alternarReproduccion}
-            className="w-14 h-14 rounded-full text-white flex items-center justify-center hover:scale-110 transition-transform"
+            className="w-14 h-14 rounded-full text-white flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
             style={{
               background: `linear-gradient(135deg, ${hex}, rgba(${r},${g},${b},0.7))`,
               boxShadow: `0 0 30px ${rgba(0.5)}`,
@@ -204,11 +227,26 @@ export function PanelNowPlaying({ cancion }) {
             }
           </button>
 
-          <button className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 cursor-not-allowed">
+          <button 
+            onClick={siguienteCancion}
+            className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 active:scale-95"
+            title="Siguiente"
+          >
             <SkipForward size={22} />
           </button>
-          <button className="text-texto-secundario/40 hover:text-acento-primario transition-colors cursor-not-allowed">
-            <Heart size={18} />
+          
+          <button 
+            onClick={alternarRepeticion}
+            className="transition-all hover:scale-110 active:scale-95" 
+            title="Repetir"
+          >
+            <Repeat 
+              size={18} 
+              style={{
+                color: repitiendo ? hex : '#A1A1AA',
+                filter: repitiendo ? `drop-shadow(0 0 5px ${hex})` : 'none',
+              }}
+            />
           </button>
         </div>
 

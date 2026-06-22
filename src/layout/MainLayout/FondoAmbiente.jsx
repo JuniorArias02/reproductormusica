@@ -1,20 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { useReproductor } from '../../features/Player/context/ContextoReproductor';
 
-// Reducido para 120fps fluido
 const CANTIDAD_ESTRELLAS = 120;
 const CANTIDAD_BLOBS = 4;
-const PASO_ESTRELLA = 0.018; // incremento por frame
+const PASO_ESTRELLA = 0.018;
 
 /**
- * Canvas full-screen de fondo. Optimizado para 120fps:
- * - Estrellas: arcos simples sin gradientes
- * - Blobs: renderizado con globalAlpha en vez de radialGradient por blob
- * - Anillos de shockwave en cambio de canción
- * - Delta-time para velocidad independiente del framerate
+ * Canvas full-screen de fondo. Optimizado para 120fps.
+ * Renderiza nebulosas orbitales y campo de estrellas con delta-time.
+ * Sin ondas ni shockwaves.
  */
 export function FondoAmbiente() {
-  const { color, cancionActual, estaReproduciendo } = useReproductor();
+  const { color, estaReproduciendo } = useReproductor();
   const refCanvas = useRef(null);
   const refRaf = useRef(null);
   const sis = useRef(null);
@@ -42,18 +39,17 @@ export function FondoAmbiente() {
     }));
 
     sis.current = {
-      estrellas, blobs, ondas: [],
+      estrellas, blobs,
       cr: 255, cg: 74, cb: 28,
       tr: 255, tg: 74, tb: 28,
       t: 0,
-      cancionId: null,
       latidoTimer: 0,
       latidoPulso: 0,
       reproduciendo: false,
     };
   }
 
-  // Ajuste de tamaño
+  // Ajuste de tamaño del canvas
   useEffect(() => {
     const c = refCanvas.current;
     if (!c) return;
@@ -63,37 +59,19 @@ export function FondoAmbiente() {
     return () => window.removeEventListener('resize', ajustar);
   }, []);
 
-  // Reaccionar a color
+  // Reaccionar a cambio de color de la canción
   useEffect(() => {
     if (!color) return;
     const s = sis.current;
     s.tr = color.r; s.tg = color.g; s.tb = color.b;
   }, [color]);
 
-  // Reaccionar a nueva canción → shockwaves desde centro
+  // Reaccionar a reproducción (latido)
   useEffect(() => {
-    if (!cancionActual) return;
-    const s = sis.current;
-    if (s.cancionId === cancionActual.id) return;
-    s.cancionId = cancionActual.id;
+    if (sis.current) sis.current.reproduciendo = estaReproduciendo;
+  }, [estaReproduciendo]);
 
-    const c = refCanvas.current;
-    if (!c) return;
-    const cx = c.width / 2, cy = c.height / 2;
-    const maxR = Math.hypot(cx, cy) * 1.5;
-
-    for (let i = 0; i < 3; i++) {
-      setTimeout(() => {
-        s.ondas.push({ x: cx, y: cy, radio: i * 12, maxRadio: maxR,
-          vel: 7 + i * 2, alpha: 0.6 - i * 0.12, grosor: 3 - i * 0.7 });
-      }, i * 130);
-    }
-  }, [cancionActual]);
-
-  // Latido
-  useEffect(() => { if (sis.current) sis.current.reproduciendo = estaReproduciendo; }, [estaReproduciendo]);
-
-  // Bucle principal
+  // Bucle principal de animación
   useEffect(() => {
     const canvas = refCanvas.current;
     if (!canvas) return;
@@ -107,15 +85,15 @@ export function FondoAmbiente() {
       const W = canvas.width, H = canvas.height;
 
       ctx.clearRect(0, 0, W, H);
-
       s.t += dt;
-      // Interpolar color
+
+      // Interpolar color suavemente
       s.cr += (s.tr - s.cr) * 0.02;
       s.cg += (s.tg - s.cg) * 0.02;
       s.cb += (s.tb - s.cb) * 0.02;
       const R = s.cr | 0, G = s.cg | 0, B = s.cb | 0;
 
-      // Latido
+      // Latido suave cuando está reproduciendo
       if (s.reproduciendo) {
         s.latidoTimer += dt;
         if (s.latidoTimer > 2400) { s.latidoTimer = 0; s.latidoPulso = 1; }
@@ -126,8 +104,8 @@ export function FondoAmbiente() {
       ctx.globalCompositeOperation = 'screen';
       const cx = W * 0.5, cy = H * 0.5;
 
-      // ── Blobs con radialGradient (GPU) ────────────────────────
-      s.blobs.forEach((blob, idx) => {
+      // ── Blobs nebulosos orbitales ────────────────────────────
+      s.blobs.forEach((blob) => {
         blob.angulo += blob.velocidad * dt;
         blob.faseAlpha += 0.00035 * dt;
 
@@ -146,7 +124,7 @@ export function FondoAmbiente() {
         ctx.fill();
       });
 
-      // Blob cian fijo
+      // Blob cian complementario (se mueve en sentido contrario)
       const bCx = cx + Math.cos(s.t * 0.00007) * W * 0.28;
       const bCy = cy + Math.sin(s.t * 0.00004) * H * 0.28;
       const bCR = Math.min(W, H) * 0.18;
@@ -158,9 +136,9 @@ export function FondoAmbiente() {
       ctx.arc(bCx, bCy, bCR, 0, Math.PI * 2);
       ctx.fill();
 
-      // ── Estrellas (sin gradiente, solo arcos) ─────────────────
+      // ── Campo de estrellas (arcos simples sin gradientes) ─────
       const est = s.estrellas;
-      ctx.fillStyle = `rgba(220,220,240,1)`;
+      ctx.fillStyle = 'rgba(220,220,240,1)';
       for (let i = 0; i < CANTIDAD_ESTRELLAS; i++) {
         const b = i * 6;
         est[b + 0] += est[b + 2] * dt;
@@ -177,23 +155,6 @@ export function FondoAmbiente() {
         ctx.fill();
       }
       ctx.globalAlpha = 1;
-
-      // ── Ondas shockwave ───────────────────────────────────────
-      s.ondas = s.ondas.filter((o) => {
-        o.radio += o.vel;
-        const t = o.radio / o.maxRadio;
-        if (t >= 1) return false;
-        const a = o.alpha * Math.pow(1 - t, 2);
-        ctx.strokeStyle = `rgba(${R},${G},${B},${a.toFixed(3)})`;
-        ctx.lineWidth = o.grosor * (1 - t * 0.5);
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = `rgba(${R},${G},${B},${(a * 0.4).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(o.x, o.y, o.radio, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        return true;
-      });
 
       ctx.globalCompositeOperation = 'source-over';
       refRaf.current = requestAnimationFrame(bucle);

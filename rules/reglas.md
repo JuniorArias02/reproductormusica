@@ -72,6 +72,7 @@ Utilizaremos un modo oscuro profundo con acentos vibrantes e inmersivos que simu
     *   La UI debe ser tonta ("Dumb Components"). La lógica compleja debe residir en los `hooks` o `services`.
     *   Si un componente sobrepasa las 150 líneas, evalúa dividirlo.
 4.  **Uso de Multimedia:** Asegurarse de utilizar la API nativa de HTML5 `<audio>` y `<video>` encapsulada dentro de custom hooks (ej. `usePlayerMedia`) para controlar los archivos locales `mp3` y `mp4`.
-5.  **Cero Dependencias Innecesarias:** Antes de instalar un paquete nuevo (ej. librerías de sliders o carruseles), evalúa si se puede construir nativamente con Tailwind y React puro para no saturar el proyecto.
+5.  **Dependencias Controladas:** Evitar librerías innecesarias (ej. sliders, carruseles) si se pueden hacer nativamente. Se permiten dependencias específicas (como `jsmediatags`) si mejoran drásticamente la experiencia visual (ej. leer portadas nativas).
 6.  **Idioma del Código:** Todas las funciones, variables y comentarios deben escribirse en **español** para mantener la consistencia en el equipo.
 7.  **Manejo de Rutas:** El enrutamiento debe manejarse de forma centralizada utilizando una librería estándar (ej. `react-router-dom`), definiendo las rutas dentro del módulo correspondiente (carpeta `router/` en cada feature) y exportándolas al enrutador principal.
+8.  **Persistencia de Datos (Local Storage):** Cualquier interacción con `localStorage` debe abstraerse dentro de un custom hook o un servicio para no contaminar la capa visual. Las claves (keys) deben tener un prefijo claro (ej. `reproductor_volumen`) para evitar colisiones.

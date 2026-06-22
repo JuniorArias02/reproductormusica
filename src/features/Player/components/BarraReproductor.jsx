@@ -16,15 +16,22 @@ export function BarraReproductor() {
     cancionActual,
     volumen,
     mezclando,
+    repitiendo,
     color,
     alternarReproduccion,
     cambiarTiempo,
     cambiarVolumen,
     alternarMezcla,
+    alternarRepeticion,
+    siguienteCancion,
+    cancionAnterior,
     alternarLike,
     estaEnLiked,
     manejarActualizacionTiempo,
     manejarMetadatosCargados,
+    panelExpandido,
+    abrirPanel,
+    cerrarPanel,
   } = useReproductor();
 
   // Elemento multimedia real (siempre montado, fuera de la barra visual)
@@ -32,6 +39,8 @@ export function BarraReproductor() {
     <video
       ref={refElemento}
       className="hidden"
+      loop={repitiendo}
+      onEnded={siguienteCancion}
       onTimeUpdate={manejarActualizacionTiempo}
       onLoadedMetadata={manejarMetadatosCargados}
     />
@@ -79,33 +88,42 @@ export function BarraReproductor() {
 
             {/* ── Izquierda: Info de la canción ───────────────────── */}
             <div className="flex items-center gap-4 w-[28%] min-w-0">
-              {/* Mini disco */}
-              <div
-                className={cn(
-                  "w-12 h-12 rounded-full border-2 flex-shrink-0 flex items-center justify-center relative overflow-hidden transition-all duration-700",
-                  estaReproduciendo && "animate-girar-vinilo"
-                )}
-                style={{
-                  borderColor: rgba(0.5),
-                  boxShadow: estaReproduciendo ? `0 0 15px ${rgba(0.4)}` : 'none',
-                  background: `radial-gradient(circle, ${rgba(0.3)} 0%, #1A1A1E 60%)`,
-                }}
+              {/* Botón invisible envolviendo la imagen y texto para que sea clickeable */}
+              <button 
+                onClick={() => panelExpandido ? cerrarPanel() : abrirPanel()}
+                className="flex items-center gap-4 flex-1 min-w-0 text-left cursor-pointer group hover:opacity-80 transition-opacity"
+                title={panelExpandido ? "Cerrar panel Now Playing" : "Abrir panel Now Playing"}
               >
-                {cancionActual.esVideo ? (
-                  <video src={cancionActual.archivo} className="absolute inset-0 w-full h-full object-cover opacity-70" muted autoPlay loop playsInline />
-                ) : null}
-                {/* Surcos */}
-                <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, transparent 30%, rgba(0,0,0,0.5) 100%)' }} />
-                <div className="w-2 h-2 rounded-full bg-zinc-700 border border-zinc-600 relative z-10" />
-              </div>
+                {/* Mini disco */}
+                <div
+                  className={cn(
+                    "w-12 h-12 rounded-full border-2 flex-shrink-0 flex items-center justify-center relative overflow-hidden transition-all duration-700",
+                    estaReproduciendo && "animate-girar-vinilo"
+                  )}
+                  style={{
+                    borderColor: rgba(0.5),
+                    boxShadow: estaReproduciendo ? `0 0 15px ${rgba(0.4)}` : 'none',
+                    background: `radial-gradient(circle, ${rgba(0.3)} 0%, #1A1A1E 60%)`,
+                  }}
+                >
+                  {cancionActual.esVideo ? (
+                    <video src={cancionActual.archivo} className="absolute inset-0 w-full h-full object-cover opacity-70" muted autoPlay loop playsInline />
+                  ) : cancionActual.portada ? (
+                    <img src={cancionActual.portada} className="absolute inset-0 w-full h-full object-cover opacity-70" alt="Cover" />
+                  ) : null}
+                  {/* Surcos */}
+                  <div className="absolute inset-0 rounded-full" style={{ background: 'radial-gradient(circle, transparent 30%, rgba(0,0,0,0.5) 100%)' }} />
+                  <div className="w-2 h-2 rounded-full bg-zinc-700 border border-zinc-600 relative z-10" />
+                </div>
 
-              {/* Texto */}
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-sm font-semibold text-texto-principal truncate leading-tight">
-                  {cancionActual.titulo}
-                </span>
-                <span className="text-xs text-texto-secundario truncate">{cancionActual.artista}</span>
-              </div>
+                {/* Texto */}
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-sm font-semibold text-texto-principal truncate leading-tight group-hover:underline decoration-white/30">
+                    {cancionActual.titulo}
+                  </span>
+                  <span className="text-xs text-texto-secundario truncate">{cancionActual.artista}</span>
+                </div>
+              </button>
 
               {/* Botón Like */}
               <button
@@ -140,7 +158,11 @@ export function BarraReproductor() {
                   />
                 </button>
 
-                <button className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 cursor-not-allowed opacity-40">
+                <button
+                  onClick={cancionAnterior}
+                  className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 active:scale-95"
+                  title="Anterior"
+                >
                   <SkipBack size={20} />
                 </button>
 
@@ -159,12 +181,26 @@ export function BarraReproductor() {
                   }
                 </button>
 
-                <button className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 cursor-not-allowed opacity-40">
+                <button
+                  onClick={siguienteCancion}
+                  className="text-texto-secundario hover:text-texto-principal transition-all hover:scale-110 active:scale-95"
+                  title="Siguiente"
+                >
                   <SkipForward size={20} />
                 </button>
 
-                <button className="text-texto-secundario/40 cursor-not-allowed opacity-40">
-                  <Repeat size={17} />
+                <button
+                  onClick={alternarRepeticion}
+                  className="transition-all duration-200 hover:scale-110 active:scale-95"
+                  title="Repetir"
+                >
+                  <Repeat
+                    size={17}
+                    style={{
+                      color: repitiendo ? hex : '#A1A1AA',
+                      filter: repitiendo ? `drop-shadow(0 0 5px ${hex})` : 'none',
+                    }}
+                  />
                 </button>
               </div>
 

@@ -39,9 +39,25 @@ export function useColorDominante(cancion, refElementoVideo) {
         refElementoVideo.current.addEventListener('loadeddata', manejar, { once: true });
       }
     } else if (!cancion.esVideo) {
-      // Para MP3, generar un color pseudoaleatorio basado en el nombre del archivo
-      const colorGenerado = generarColorDesdeCadena(cancion.titulo);
-      setColor(colorGenerado);
+      if (cancion.portada) {
+        setCargando(true);
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+          extraerColorDominante(img)
+            .then(setColor)
+            .catch(() => setColor(generarColorDesdeCadena(cancion.titulo)))
+            .finally(() => setCargando(false));
+        };
+        img.onerror = () => {
+          setColor(generarColorDesdeCadena(cancion.titulo));
+          setCargando(false);
+        };
+        img.src = cancion.portada;
+      } else {
+        // Para MP3 sin portada, generar color basado en el nombre
+        setColor(generarColorDesdeCadena(cancion.titulo));
+      }
     }
   }, [cancion, refElementoVideo]);
 
