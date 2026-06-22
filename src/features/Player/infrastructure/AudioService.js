@@ -43,16 +43,14 @@ class AudioService {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.audioCtx = new AudioContext();
       const source = this.audioCtx.createMediaElementSource(this.mediaElement);
-      this.analyser = this.audioCtx.createAnalyser();
-
-      // fftSize 256 = 128 bins. Cada bin ≈ 344Hz (sampleRate 44100 / 256)
-      // Esto nos da resolución suficiente para separar graves, medios y agudos.
-      this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.7; // Suavizado nativo del analizador
+      this.analyser = this.audioCtx.createAnalyser();      // fftSize 2048 = 1024 bins. Cada bin ≈ 21.5Hz (sampleRate 44100 / 2048)
+      // Esto da resolución real para separar sub-bass de kick de lowMids.
+      this.analyser.fftSize = 2048;
+      this.analyser.smoothingTimeConstant = 0.75;
       source.connect(this.analyser);
       this.analyser.connect(this.audioCtx.destination);
 
-      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount); // 128 bins
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount); // 1024 bins
       this.audioIniciado = true;
     } catch (e) {
       console.warn('No se pudo iniciar Web Audio API:', e);
@@ -104,45 +102,52 @@ class AudioService {
   }
 
   /**
-   * Retorna 3 valores normalizados (0-1) para cada banda de frecuencia.
-   * Con 128 bins a ~344Hz/bin:
-   *   - bajos:  bins 0-4  → 0 a ~1.7kHz (kick, bombo, bajo)
-   *   - medios: bins 5-20 → ~1.7kHz a ~6.9kHz (voz, guitarra, piano)
-   *   - altos:  bins 21-63 → ~7kHz a ~22kHz (hi-hats, platillos, presencia vocal alta)
+   * 6-Band Analysis — fftSize 2048, ~21.5Hz/bin
+   *   subBass:  bins  1-3   → 21-64Hz   (sub-graves, bombo profundo)
+   *   kickBass: bins  3-7   → 64-150Hz  (bombo/kick, contrabajo)
+   *   lowMids:  bins  7-23  → 150-494Hz (guitarras bajas, piano bajo, voz grave)
+   *   mids:     bins 23-93  → 494-2kHz  (voz principal, guitarra rítmica)
+   *   presence: bins 93-279 → 2k-6kHz   (ataque de guitarra, sibilancia vocal)
+   *   air:      bins 279-512→ 6k-11kHz  (hi-hats, platillos, brillo)
    */
-  getBands() {
+  getBands6() {
     if (!this.audioIniciado || !this.analyser || !this.dataArray) {
-      return { bajos: 0, medios: 0, altos: 0 };
+      return { subBass: 0, kickBass: 0, lowMids: 0, mids: 0, presence: 0, air: 0 };
     }
     this.analyser.getByteFrequencyData(this.dataArray);
     const f = this.dataArray;
 
-    // ── Bajos: pico máximo de los primeros 4 bins (kick, bombo) ─────────
-    let pBajos = 0;
-    for (let i = 0; i < 4; i++) pBajos = Math.max(pBajos, f[i]);
-    // Noise gate: solo reaccionar a golpes reales (>160/255)
-    const bajos = Math.pow(Math.max(0, pBajos - 160) / 95, 2.5);
+    const peak = (lo, hi) => {
+      let m = 0;
+      for (let i = lo; i < hi; i++) if (f[i] > m) m = f[i];
+      return m / 255;
+    };
+    const rms = (lo, hi) => {
+      let s = 0, n = hi - lo;
+      for (let i = lo; i < hi; i++) s += f[i];
+      return (s / n) / 255;
+    };
 
-    // ── Medios: promedio RMS de bins 5-20 (voz, instrumentos melódicos) ─
-    let sumMedios = 0;
-    for (let i = 5; i <= 20; i++) sumMedios += f[i];
-    const avgMedios = sumMedios / 16;
-    // Umbral bajo para que reaccione a voces y cuerdas suaves también
-    const medios = Math.pow(Math.max(0, avgMedios - 80) / 175, 1.5);
-
-    // ── Altos: energía RMS de bins 21-63 (hi-hats, platillos, sibilancia) ─
-    let sumAltos = 0;
-    for (let i = 21; i <= 63; i++) sumAltos += f[i];
-    const avgAltos = sumAltos / 43;
-    // Los agudos suelen ser más silenciosos, umbral muy bajo
-    const altos = Math.pow(Math.max(0, avgAltos - 40) / 215, 1.2);
+    // Peak para bandas percusivas (reacciona al impacto exacto)
+    // RMS para bandas melódicas (energía sostenida)
+    const subBass  = Math.pow(Math.max(0, peak(1,  3)  - 0.15) / 0.85, 2.0);
+    const kickBass = Math.pow(Math.max(0, peak(3,  7)  - 0.20) / 0.80, 2.5);
+    const lowMids  = Math.pow(Math.max(0, rms(7,  23)  - 0.10) / 0.90, 1.5);
+    const mids     = Math.pow(Math.max(0, rms(23, 93)  - 0.08) / 0.92, 1.3);
+    const presence = Math.pow(Math.max(0, rms(93, 279) - 0.06) / 0.94, 1.2);
+    const air      = Math.pow(Math.max(0, rms(279,512) - 0.04) / 0.96, 1.1);
 
     return {
-      bajos: Math.min(bajos, 1),
-      medios: Math.min(medios, 1),
-      altos: Math.min(altos, 1),
+      subBass:  Math.min(subBass,  1),
+      kickBass: Math.min(kickBass, 1),
+      lowMids:  Math.min(lowMids,  1),
+      mids:     Math.min(mids,     1),
+      presence: Math.min(presence, 1),
+      air:      Math.min(air,      1),
     };
   }
+
+  getBands() { return this.getBands6(); } // Alias retrocompatible
 
   // Suscriptores
   onTimeUpdate(cb) { this.onTimeUpdateCallback = cb; }
