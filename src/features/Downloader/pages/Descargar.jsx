@@ -9,6 +9,7 @@ export function Descargar() {
   const [descargando, setDescargando] = useState(false);
   const [estado, setEstado] = useState(null); // 'idle' | 'success' | 'error'
   const [mensaje, setMensaje] = useState('');
+  const [progreso, setProgreso] = useState(0);
   
   const { color } = useReproductor();
 
@@ -27,34 +28,48 @@ export function Descargar() {
 
     setDescargando(true);
     setEstado('idle');
-    setMensaje(`Procesando ${formato.toUpperCase()} y metadatos... (esto puede tardar unos segundos)`);
+    setProgreso(0);
+    setMensaje(`Conectando con el servidor...`);
 
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${apiUrl}/downloads/youtube`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url, format: formato }),
-      });
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    const streamUrl = `${apiUrl}/downloads/stream?url=${encodeURIComponent(url)}&format=${formato}`;
 
-      const responseData = await response.json();
+    const source = new EventSource(streamUrl);
 
-      if (!response.ok || !responseData.success) {
-        throw new Error(responseData.message || 'Error al descargar la canción');
+    source.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.status === 'downloading') {
+          setProgreso(data.percentage || 0);
+          setMensaje(`Descargando: ${data.percentage}%`);
+        } else if (data.status === 'processing') {
+          setProgreso(100);
+          setMensaje('Descarga completada. Procesando metadatos...');
+        } else if (data.status === 'completed') {
+          setEstado('success');
+          setMensaje(`¡Descargado con éxito! Se guardó como: ${data.track?.title || 'Archivo'}.${formato}`);
+          setUrl('');
+          setDescargando(false);
+          source.close();
+        } else if (data.error) {
+          setEstado('error');
+          setMensaje(data.error);
+          setDescargando(false);
+          source.close();
+        }
+      } catch (err) {
+        console.error('Error parseando evento SSE', err);
       }
+    };
 
-      setEstado('success');
-      setMensaje(`¡Descargado con éxito! Se guardó como: ${responseData.data?.track?.title || 'Archivo'}.${formato}`);
-      setUrl('');
-      
-    } catch (error) {
+    source.onerror = (err) => {
+      console.error('Error de conexión SSE', err);
       setEstado('error');
-      setMensaje(error.message || 'Error de conexión con el servidor.');
-    } finally {
+      setMensaje('Error de conexión o el servidor cerró el stream.');
       setDescargando(false);
-    }
+      source.close();
+    };
   };
 
   return (
@@ -151,6 +166,27 @@ export function Descargar() {
                   <Video size={18} />
                   Video + Audio (MP4)
                 </button>
+              </div>
+            </div>
+
+            {/* Barra de progreso de descarga real */}
+            <div className={cn(
+              "mb-6 w-full relative transition-all duration-500",
+              descargando || (progreso > 0 && progreso < 100) ? "opacity-100" : "opacity-0 h-0 mb-0"
+            )}>
+              <div className="flex justify-between text-xs text-texto-secundario mb-1.5 font-medium tracking-wider">
+                <span className="uppercase">Progreso</span>
+                <span>{progreso}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden relative">
+                <div 
+                  className="absolute inset-y-0 left-0 h-full rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${progreso}%`,
+                    background: `linear-gradient(90deg, transparent, ${colorHex})`,
+                    boxShadow: `0 0 12px ${colorHex}`
+                  }}
+                />
               </div>
             </div>
 

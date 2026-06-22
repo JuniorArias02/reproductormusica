@@ -14,7 +14,8 @@ async function buscarEnItunes(terminoBusqueda) {
       return {
         portada: portadaAltaRes,
         artista: pista.artistName,
-        tituloMetadatos: pista.trackName
+        tituloMetadatos: pista.trackName,
+        duracionMs: pista.trackTimeMillis
       };
     }
   } catch (error) {
@@ -40,7 +41,8 @@ export function extraerMetadatosMP3(urlArchivo, tituloSugerido = '') {
           resolve({
             portada: itunes.portada,
             artista: datos.artista !== 'Artista Local' ? datos.artista : itunes.artista,
-            tituloMetadatos: datos.tituloMetadatos || itunes.tituloMetadatos
+            tituloMetadatos: datos.tituloMetadatos || itunes.tituloMetadatos,
+            duracion: datos.duracion || (itunes.duracionMs ? itunes.duracionMs / 1000 : 0)
           });
           return;
         }
@@ -49,8 +51,14 @@ export function extraerMetadatosMP3(urlArchivo, tituloSugerido = '') {
     };
 
     const leerMetadatos = async () => {
+      const duracionAudio = await new Promise(resolve => {
+        const a = new Audio(urlArchivo);
+        a.onloadedmetadata = () => resolve(a.duration);
+        a.onerror = () => resolve(0);
+      });
+
       if (!jsm || !jsm.read) {
-        resolverConFallback({ portada: null, artista: 'Artista Local', tituloMetadatos: null });
+        resolverConFallback({ portada: null, artista: 'Artista Local', tituloMetadatos: null, duracion: duracionAudio });
         return;
       }
 
@@ -81,17 +89,18 @@ export function extraerMetadatosMP3(urlArchivo, tituloSugerido = '') {
             resolverConFallback({
               portada: imageUrl,
               artista: tags.artist || 'Artista Local',
-              tituloMetadatos: tags.title || null
+              tituloMetadatos: tags.title || null,
+              duracion: duracionAudio
             });
           },
           onError: function() {
             // Falla silenciosa si no tiene metadatos ID3. Entra el fallback.
-            resolverConFallback({ portada: null, artista: 'Artista Local', tituloMetadatos: null });
+            resolverConFallback({ portada: null, artista: 'Artista Local', tituloMetadatos: null, duracion: duracionAudio });
           }
         });
       } catch (err) {
         console.warn("Error descargando blob:", err);
-        resolverConFallback({ portada: null, artista: 'Artista Local', tituloMetadatos: null });
+        resolverConFallback({ portada: null, artista: 'Artista Local', tituloMetadatos: null, duracion: duracionAudio });
       }
     };
 

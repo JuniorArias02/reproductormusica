@@ -1,6 +1,7 @@
 import { useReproductor } from '../../Player/context/ContextoReproductor';
 import { Play, Pause, Heart, Clock, Music, Film } from 'lucide-react';
 import { cn } from '../../../utils/clases';
+import { formatearTiempo } from '../../Player/utils/formatoTiempo';
 
 export function Libreria() {
   const { 
@@ -160,7 +161,9 @@ export function Libreria() {
                   >
                     <Heart size={16} fill={liked ? colorHex : 'none'} style={{ color: liked ? colorHex : '#A1A1AA' }} />
                   </button>
-                  <span className="text-xs font-medium text-texto-secundario tabular-nums">--:--</span>
+                  <span className="text-xs font-medium text-texto-secundario tabular-nums">
+                    {cancion.duracion ? formatearTiempo(cancion.duracion) : '--:--'}
+                  </span>
                 </div>
               </div>
             );

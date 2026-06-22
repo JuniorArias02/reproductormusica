@@ -6,6 +6,8 @@ import { Ajustes } from '../features/Settings/pages/Ajustes';
 import { Descargar } from '../features/Downloader/pages/Descargar';
 import { Inmersivo } from '../features/Player/pages/Inmersivo';
 
+import { Favoritos } from '../features/Libreria/pages/Favoritos';
+
 export function EnrutadorPrincipal() {
   return (
     <BrowserRouter>
@@ -13,6 +15,7 @@ export function EnrutadorPrincipal() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Inicio />} />
           <Route path="libreria" element={<Libreria />} />
+          <Route path="favoritos" element={<Favoritos />} />
           <Route path="descargar" element={<Descargar />} />
           <Route path="inmersivo" element={<Inmersivo />} />
           <Route path="ajustes" element={<Ajustes />} />

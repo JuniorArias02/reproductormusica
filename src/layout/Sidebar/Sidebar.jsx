@@ -1,4 +1,4 @@
-import { Music, Home, Library, Settings, CloudDownload, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
+import { Music, Home, Library, Settings, CloudDownload, PanelLeftClose, PanelLeftOpen, Sparkles, Heart } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../../utils/clases';
 import { useReproductor } from '../../features/Player/context/ContextoReproductor';
@@ -15,6 +15,7 @@ export function Sidebar() {
   const enlaces = [
     { ruta: '/', icono: <Home size={20} />, etiqueta: 'Inicio' },
     { ruta: '/libreria', icono: <Library size={20} />, etiqueta: 'Librería' },
+    { ruta: '/favoritos', icono: <Heart size={20} />, etiqueta: 'Tus Me Gusta' },
     { ruta: '/inmersivo', icono: <Sparkles size={20} />, etiqueta: 'Zen / Inmersivo' },
     { ruta: '/descargar', icono: <CloudDownload size={20} />, etiqueta: 'Descargar' },
     { ruta: '/ajustes', icono: <Settings size={20} />, etiqueta: 'Ajustes' },

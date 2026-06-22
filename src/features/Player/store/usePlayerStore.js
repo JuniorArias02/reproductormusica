@@ -173,8 +173,17 @@ export const usePlayerStore = create((set, get) => {
                 portada: meta.portada,
                 artista: meta.artista !== 'Artista Local' ? meta.artista : c.artista,
                 titulo: meta.tituloMetadatos ? meta.tituloMetadatos : c.titulo,
+                duracion: meta.duracion || 0
               };
-            } catch(e) { return c; }
+            } catch(e) { return { ...c, duracion: 0 }; }
+          } else if (c.esVideo) {
+             const dur = await new Promise(resolve => {
+                const v = document.createElement('video');
+                v.src = c.archivo;
+                v.onloadedmetadata = () => resolve(v.duration);
+                v.onerror = () => resolve(0);
+             });
+             return { ...c, duracion: dur };
           }
           return c;
         })
@@ -196,6 +205,7 @@ export const usePlayerStore = create((set, get) => {
         let portada = null;
         let artista = 'Artista Desconocido';
         let titulo = archivo.name.replace(/\.[^/.]+$/, "");
+        let duracion = 0;
         
         if (!esVideo) {
           try {
@@ -203,11 +213,19 @@ export const usePlayerStore = create((set, get) => {
             portada = meta.portada;
             if (meta.artista !== 'Artista Local') artista = meta.artista;
             if (meta.tituloMetadatos) titulo = meta.tituloMetadatos;
+            duracion = meta.duracion || 0;
           } catch(e) {}
+        } else {
+          duracion = await new Promise(resolve => {
+            const v = document.createElement('video');
+            v.src = objectUrl;
+            v.onloadedmetadata = () => resolve(v.duration);
+            v.onerror = () => resolve(0);
+          });
         }
         
         nuevasCanciones.push({
-          id, titulo, artista, portada, archivo: objectUrl, esVideo
+          id, titulo, artista, portada, archivo: objectUrl, esVideo, duracion
         });
       }
       
