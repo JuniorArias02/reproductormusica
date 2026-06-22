@@ -1,4 +1,4 @@
-import { Music, Home, Library, Settings } from 'lucide-react';
+import { Music, Home, Library, Settings, CloudDownload } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../../utils/clases';
 import { useReproductor } from '../../features/Player/context/ContextoReproductor';
@@ -15,6 +15,7 @@ export function Sidebar() {
   const enlaces = [
     { ruta: '/',         icono: <Home size={18} />,    etiqueta: 'Inicio'   },
     { ruta: '/libreria', icono: <Library size={18} />, etiqueta: 'Librería' },
+    { ruta: '/descargar',icono: <CloudDownload size={18} />, etiqueta: 'Descargar' },
     { ruta: '/ajustes',  icono: <Settings size={18} />, etiqueta: 'Ajustes'  },
   ];
 

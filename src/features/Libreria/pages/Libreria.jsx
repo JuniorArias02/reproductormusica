@@ -11,7 +11,8 @@ export function Libreria() {
     alternarReproduccion, 
     color, 
     estaEnLiked, 
-    alternarLike 
+    alternarLike,
+    importarCancionesLocales
   } = useReproductor();
 
   const colorHex = color?.hex ?? '#FF4A1C';
@@ -37,9 +38,32 @@ export function Libreria() {
         <div className="flex flex-col pb-2">
           <span className="uppercase tracking-widest text-xs font-bold text-texto-secundario mb-2">Playlist</span>
           <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight mb-4 drop-shadow-lg">Tu Librería</h1>
-          <p className="text-texto-secundario text-sm font-medium">
-            <span className="text-white">{listaCanciones?.length || 0} canciones</span> locales encontradas
-          </p>
+          
+          <div className="flex items-center gap-6 mt-2">
+            <p className="text-texto-secundario text-sm font-medium">
+              <span className="text-white">{listaCanciones?.length || 0} canciones</span> locales
+            </p>
+
+            <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all">
+              <div className="w-6 h-6 rounded-full bg-acento-primario flex items-center justify-center text-white">
+                <Music size={12} />
+              </div>
+              <span className="text-sm font-semibold text-white">Importar archivos</span>
+              <input 
+                type="file" 
+                multiple 
+                accept="audio/*,video/mp4" 
+                className="hidden" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    importarCancionesLocales(Array.from(e.target.files));
+                    // Limpiar el input para permitir volver a subir el mismo archivo si es necesario
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+          </div>
         </div>
       </div>
 

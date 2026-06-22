@@ -70,6 +70,48 @@ export function useReproductorMultimedia() {
     return () => { montado = false; };
   }, []);
 
+  const importarCancionesLocales = useCallback(async (archivos) => {
+    if (!archivos || archivos.length === 0) return;
+    
+    const nuevasCanciones = [];
+    
+    for (const archivo of archivos) {
+      if (!archivo.type.startsWith('audio/') && !archivo.type.startsWith('video/')) continue;
+      
+      const objectUrl = URL.createObjectURL(archivo);
+      const esVideo = archivo.type.startsWith('video/');
+      const id = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      let portada = null;
+      let artista = 'Artista Desconocido';
+      let titulo = archivo.name.replace(/\.[^/.]+$/, "");
+      
+      if (!esVideo) {
+        try {
+          const meta = await extraerMetadatosMP3(objectUrl, titulo);
+          portada = meta.portada;
+          if (meta.artista !== 'Artista Local') artista = meta.artista;
+          if (meta.tituloMetadatos) titulo = meta.tituloMetadatos;
+        } catch(e) {
+          console.warn("No metadatos para", archivo.name);
+        }
+      }
+      
+      nuevasCanciones.push({
+        id,
+        titulo,
+        artista,
+        portada,
+        archivo: objectUrl,
+        esVideo
+      });
+    }
+    
+    if (nuevasCanciones.length > 0) {
+      setListaCanciones(prev => [...prev, ...nuevasCanciones]);
+    }
+  }, []);
+
   const reproducir = useCallback(async () => {
     if (refElemento.current) {
       try {
@@ -263,5 +305,6 @@ export function useReproductorMultimedia() {
     panelExpandido,
     abrirPanel,
     cerrarPanel,
+    importarCancionesLocales,
   };
 }
