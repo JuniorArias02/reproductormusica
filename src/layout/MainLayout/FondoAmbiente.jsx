@@ -11,7 +11,7 @@ const PASO_ESTRELLA = 0.018;
  * Sin ondas ni shockwaves.
  */
 export function FondoAmbiente() {
-  const { color, estaReproduciendo } = useReproductor();
+  const { color, estaReproduciendo, obtenerFrecuencias } = useReproductor();
   const refCanvas = useRef(null);
   const refRaf = useRef(null);
   const sis = useRef(null);
@@ -43,8 +43,6 @@ export function FondoAmbiente() {
       cr: 255, cg: 74, cb: 28,
       tr: 255, tg: 74, tb: 28,
       t: 0,
-      latidoTimer: 0,
-      latidoPulso: 0,
       reproduciendo: false,
     };
   }
@@ -85,7 +83,21 @@ export function FondoAmbiente() {
       const W = canvas.width, H = canvas.height;
 
       ctx.clearRect(0, 0, W, H);
-      s.t += dt;
+      
+      // Sincronización Épica con Audio (Bajos)
+      let factorAudio = 0;
+      if (s.reproduciendo && obtenerFrecuencias) {
+        const frecuencias = obtenerFrecuencias();
+        if (frecuencias) {
+          // Tomar promedio de graves (primeros 5 valores)
+          let graves = 0;
+          for (let i = 0; i < 5; i++) graves += frecuencias[i];
+          factorAudio = (graves / 5) / 255; // Rango de 0 a 1
+        }
+      }
+
+      // El tiempo global avanza más rápido si hay graves fuertes
+      s.t += dt * (1 + factorAudio * 2);
 
       // Interpolar color suavemente
       s.cr += (s.tr - s.cr) * 0.02;
@@ -93,13 +105,8 @@ export function FondoAmbiente() {
       s.cb += (s.tb - s.cb) * 0.02;
       const R = s.cr | 0, G = s.cg | 0, B = s.cb | 0;
 
-      // Latido suave cuando está reproduciendo
-      if (s.reproduciendo) {
-        s.latidoTimer += dt;
-        if (s.latidoTimer > 2400) { s.latidoTimer = 0; s.latidoPulso = 1; }
-      }
-      if (s.latidoPulso > 0) s.latidoPulso = Math.max(0, s.latidoPulso - dt * 0.004);
-      const factorLatido = 1 + Math.sin(s.latidoPulso * Math.PI) * 0.12;
+      // El tamaño del "latido" pulsa intensamente con los graves
+      const factorLatido = 1 + (factorAudio * 0.4);
 
       ctx.globalCompositeOperation = 'screen';
       const cx = W * 0.5, cy = H * 0.5;
