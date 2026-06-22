@@ -156,6 +156,10 @@ export const usePlayerStore = create((set, get) => {
       return audioService.getFrequencies();
     },
 
+    obtenerBandas: () => {
+      return audioService.getBands();
+    },
+
     // ─── Funciones asíncronas para inicialización ───
     iniciarMetadatosEstaticos: async () => {
       const { listaCanciones } = get();

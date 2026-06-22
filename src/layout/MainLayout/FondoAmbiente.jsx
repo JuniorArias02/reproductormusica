@@ -6,18 +6,19 @@ const CANTIDAD_BLOBS = 4;
 const PASO_ESTRELLA = 0.018;
 
 /**
- * Canvas full-screen de fondo. Optimizado para 120fps.
- * Renderiza nebulosas orbitales y campo de estrellas con delta-time.
- * Sin ondas ni shockwaves.
+ * Canvas full-screen de fondo — Motor de animación Multi-Banda.
+ * Cada frecuencia controla un elemento visual distinto:
+ *   BAJOS  → Tamaño + flash de burbujas nebulosas (bombo/kick)
+ *   MEDIOS → Velocidad orbital de las burbujas + blob cian (voz/guitarras)
+ *   ALTOS  → Brillo, velocidad y tamaño de las estrellas (hi-hats/platillos)
  */
 export function FondoAmbiente() {
-  const { color, estaReproduciendo, obtenerFrecuencias } = useReproductor();
+  const { color, estaReproduciendo, obtenerBandas } = useReproductor();
   const refCanvas = useRef(null);
   const refRaf = useRef(null);
   const sis = useRef(null);
 
   if (!sis.current) {
-    // Estrellas: Float32Array [x, y, vx, vy, radio, fase]
     const estrellas = new Float32Array(CANTIDAD_ESTRELLAS * 6);
     for (let i = 0; i < CANTIDAD_ESTRELLAS; i++) {
       const b = i * 6;
@@ -29,12 +30,11 @@ export function FondoAmbiente() {
       estrellas[b + 5] = Math.random() * Math.PI * 2;
     }
 
-    // Blobs orbitales
     const blobs = Array.from({ length: CANTIDAD_BLOBS }, (_, i) => ({
       angulo: (Math.PI * 2 / CANTIDAD_BLOBS) * i,
       radioOrbit: 0.14 + Math.random() * 0.20,
-      velocidad: (0.00012 + Math.random() * 0.00008) * (i % 2 === 0 ? 1 : -1),
-      tamano: 0.16 + Math.random() * 0.10,
+      velocidad: (0.00010 + Math.random() * 0.00006) * (i % 2 === 0 ? 1 : -1),
+      tamano: 0.12 + Math.random() * 0.08, // pequeños en reposo
       faseAlpha: Math.random() * Math.PI * 2,
     }));
 
@@ -44,10 +44,11 @@ export function FondoAmbiente() {
       tr: 255, tg: 74, tb: 28,
       t: 0,
       reproduciendo: false,
+      // Envelopes independientes por banda
+      sBajos: 0, sMedios: 0, sAltos: 0,
     };
   }
 
-  // Ajuste de tamaño del canvas
   useEffect(() => {
     const c = refCanvas.current;
     if (!c) return;
@@ -57,19 +58,16 @@ export function FondoAmbiente() {
     return () => window.removeEventListener('resize', ajustar);
   }, []);
 
-  // Reaccionar a cambio de color de la canción
   useEffect(() => {
     if (!color) return;
     const s = sis.current;
     s.tr = color.r; s.tg = color.g; s.tb = color.b;
   }, [color]);
 
-  // Reaccionar a reproducción (latido)
   useEffect(() => {
     if (sis.current) sis.current.reproduciendo = estaReproduciendo;
   }, [estaReproduciendo]);
 
-  // Bucle principal de animación
   useEffect(() => {
     const canvas = refCanvas.current;
     if (!canvas) return;
@@ -83,65 +81,46 @@ export function FondoAmbiente() {
       const W = canvas.width, H = canvas.height;
 
       ctx.clearRect(0, 0, W, H);
-      
-      // Sincronización Épica y Agresiva con Audio (Física de Altavoz Real)
-      let factorAudioBase = 0;
-      if (s.reproduciendo && obtenerFrecuencias) {
-        const frecuencias = obtenerFrecuencias();
-        if (frecuencias) {
-          // Extraer el "pico" real de graves (primeras 4 bandas)
-          // Usamos Math.max para no diluir el golpe seco del bombo (kick)
-          let graves = 0;
-          for (let i = 0; i < 4; i++) {
-            graves = Math.max(graves, frecuencias[i]);
-          }
-          
-          // Mapeo exponencial: Cortamos el ruido por debajo de 160
-          // El rango útil para impactos es de 160 a 255 (95 de diferencia)
-          let intensidadCruda = Math.max(0, graves - 160) / 95; 
-          
-          // Elevamos a la 3ra potencia. 
-          // Esto apaga los sonidos normales y hace explotar los golpes verdaderos.
-          factorAudioBase = Math.pow(intensidadCruda, 3);
+
+      // ── Análisis multi-banda ─────────────────────────────────────────
+      // 3 señales independientes. Cada una tiene su propio envelope A/D.
+      let rawBajos = 0, rawMedios = 0, rawAltos = 0;
+      if (s.reproduciendo && obtenerBandas) {
+        const bands = obtenerBandas();
+        if (bands) {
+          rawBajos  = bands.bajos;
+          rawMedios = bands.medios;
+          rawAltos  = bands.altos;
         }
       }
 
-      // Fast Attack, Slow Decay (Ataque rápido, Caída suave elástica)
-      if (s.factorAudioSuave === undefined) s.factorAudioSuave = 0;
-      
-      if (factorAudioBase > s.factorAudioSuave) {
-         // Ataque brutal: el visualizador reacciona al instante
-         s.factorAudioSuave += (factorAudioBase - s.factorAudioSuave) * 0.85;
-      } else {
-         // Decay (Caída): se desinfla suavemente como la membrana de un altavoz
-         s.factorAudioSuave += (factorAudioBase - s.factorAudioSuave) * 0.08;
-      }
+      // Fast Attack / Slow Decay — permite distinguir la "textura" de cada instrumento
+      // BAJOS: ataque brutal (0.80), decay elástico (0.06) → efecto membrana de bombo
+      s.sBajos  += rawBajos  > s.sBajos  ? (rawBajos  - s.sBajos)  * 0.80 : (rawBajos  - s.sBajos)  * 0.06;
+      // MEDIOS: más orgánico (0.40/0.10) → la voz y guitarra fluyen
+      s.sMedios += rawMedios > s.sMedios ? (rawMedios - s.sMedios) * 0.40 : (rawMedios - s.sMedios) * 0.10;
+      // ALTOS: muy reactivo (0.65/0.12) → chispa en cada hi-hat
+      s.sAltos  += rawAltos  > s.sAltos  ? (rawAltos  - s.sAltos)  * 0.65 : (rawAltos  - s.sAltos)  * 0.12;
 
-      // El tiempo global avanza hasta 20 VECES MÁS RÁPIDO en el drop
-      s.t += dt * (1 + s.factorAudioSuave * 20);
+      // El tiempo global se acelera con energía de medios y altos (no con bajos)
+      s.t += dt * (1 + s.sMedios * 12 + s.sAltos * 5);
 
-      // Interpolar color suavemente
       s.cr += (s.tr - s.cr) * 0.02;
       s.cg += (s.tg - s.cg) * 0.02;
       s.cb += (s.tb - s.cb) * 0.02;
       const R = s.cr | 0, G = s.cg | 0, B = s.cb | 0;
 
-      // El tamaño base ahora es más pequeño (0.65), pero explota masivamente (+1.85 = 2.5x)
-      const factorLatido = 0.65 + (s.factorAudioSuave * 1.85);
-
       ctx.globalCompositeOperation = 'screen';
       const cx = W * 0.5, cy = H * 0.5;
 
-      // ---- OPTIMIZACIÓN: Caché de texturas de Blobs ----
+      // ── Caché de texturas de Blobs ────────────────────────────────────
       if (!s.cacheCanvas) {
         s.cacheCanvas = document.createElement('canvas');
-        s.cacheCanvas.width = 256;
-        s.cacheCanvas.height = 256;
+        s.cacheCanvas.width = 256; s.cacheCanvas.height = 256;
         s.cacheCtx = s.cacheCanvas.getContext('2d', { alpha: true });
-        
+
         s.cyanCanvas = document.createElement('canvas');
-        s.cyanCanvas.width = 256;
-        s.cyanCanvas.height = 256;
+        s.cyanCanvas.width = 256; s.cyanCanvas.height = 256;
         const cyanCtx = s.cyanCanvas.getContext('2d', { alpha: true });
         const gC = cyanCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
         gC.addColorStop(0, 'rgba(0,240,255,0.8)');
@@ -150,7 +129,6 @@ export function FondoAmbiente() {
         cyanCtx.fillRect(0, 0, 256, 256);
       }
 
-      // Solo actualizar la textura si el color cambió significativamente
       if (s.lastR !== R || s.lastG !== G || s.lastB !== B) {
         s.cacheCtx.clearRect(0, 0, 256, 256);
         const grad = s.cacheCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
@@ -162,61 +140,63 @@ export function FondoAmbiente() {
         s.lastR = R; s.lastG = G; s.lastB = B;
       }
 
-      // ── Blobs nebulosos orbitales ────────────────────────────
+      // ── BLOBS → Controlados SOLO por BAJOS ───────────────────────────
+      // Reposo: pequeños y tenues. Drop/Bombo: explotan. Voz sola: no cambian tamaño.
       s.blobs.forEach((blob) => {
-        // Velocidad de rotación aumentada drásticamente en el beat
-        blob.angulo += blob.velocidad * dt * (1 + s.factorAudioSuave * 8);
-        blob.faseAlpha += 0.00035 * dt * (1 + factorAudioBase * 2);
+        // La VELOCIDAD ORBITAL la controlan los MEDIOS (voz/guitarra/piano)
+        blob.angulo += blob.velocidad * dt * (1 + s.sMedios * 10);
+        blob.faseAlpha += 0.00035 * dt * (1 + s.sAltos * 3);
 
         const bx = cx + Math.cos(blob.angulo) * blob.radioOrbit * W;
         const by = cy + Math.sin(blob.angulo * 0.65) * blob.radioOrbit * H * 0.55;
-        const radio = blob.tamano * Math.min(W, H) * factorLatido;
-        
-        // El destello de opacidad usa el Base (sin suavizar) para que flashee como estroboscopio
-        const alpha = (0.035 + Math.abs(Math.sin(blob.faseAlpha)) * 0.04) + (factorAudioBase * 0.45);
 
-        ctx.globalAlpha = Math.min(alpha * 1.8, 1);
+        // TAMAÑO: base 0.55, explota hasta 2.45 con los bajos (bombo/kick)
+        const factorTamano = 0.55 + (s.sBajos * 1.9);
+        const radio = blob.tamano * Math.min(W, H) * factorTamano;
+
+        // OPACIDAD: base orgánica + flash instantáneo del pico crudo de bajos
+        const alphaBase = 0.03 + Math.abs(Math.sin(blob.faseAlpha)) * 0.04;
+        const alphaFlash = rawBajos * 0.55; // sin suavizar = flash estroboscópico real
+        ctx.globalAlpha = Math.min((alphaBase + alphaFlash) * 2.2, 1);
         ctx.drawImage(s.cacheCanvas, bx - radio, by - radio, radio * 2, radio * 2);
       });
 
-      // Blob cian complementario reacciona a los altos
+      // ── BLOB CIAN → Responde a MEDIOS (voz/melodías) ────────────────
       const bCx = cx + Math.cos(s.t * 0.00007) * W * 0.28;
       const bCy = cy + Math.sin(s.t * 0.00004) * H * 0.28;
-      const bCR = Math.min(W, H) * 0.18 * (1 + s.factorAudioSuave * 1.2); 
-      ctx.globalAlpha = 0.04 + (factorAudioBase * 0.25); 
+      const bCR = Math.min(W, H) * 0.14 * (1 + s.sMedios * 1.5);
+      ctx.globalAlpha = 0.03 + (s.sMedios * 0.20);
       ctx.drawImage(s.cyanCanvas, bCx - bCR, bCy - bCR, bCR * 2, bCR * 2);
-      
-      // ── Campo de estrellas hiperespacial ─────
-      const est = s.estrellas;
+
+      // ── ESTRELLAS → Controladas SOLO por ALTOS ───────────────────────
+      // Cada hi-hat, platillo, sibilancia vocal y rasgueo las enciende.
       ctx.fillStyle = 'rgba(255,255,255,1)';
-      
-      // La velocidad del viaje espacial se dispara con el pico crudo
-      const velocidadViaje = 1 + (Math.pow(factorAudioBase, 2) * 50); 
+      const velocidadViaje = 1 + (Math.pow(rawAltos, 1.5) * 30);
+      const est = s.estrellas;
 
       for (let i = 0; i < CANTIDAD_ESTRELLAS; i++) {
         const b = i * 6;
         est[b + 0] += est[b + 2] * dt * velocidadViaje;
         est[b + 1] += est[b + 3] * dt * velocidadViaje;
-        est[b + 5] += PASO_ESTRELLA * (1 + factorAudioBase * 5);
-        
+        est[b + 5] += PASO_ESTRELLA * (1 + rawAltos * 6);
+
         if (est[b + 1] < 0) { est[b + 1] = 1; est[b + 0] = Math.random(); }
         if (est[b + 1] > 1) { est[b + 1] = 0; est[b + 0] = Math.random(); }
         if (est[b + 0] < 0) est[b + 0] = 1;
         if (est[b + 0] > 1) est[b + 0] = 0;
 
-        // Las estrellas brillan intensamente cuando pega el beat
-        const alpha = (0.15 + Math.abs(Math.sin(est[b + 5])) * 0.55) + (factorAudioBase * 0.6);
+        // Brillo: pico CRUDO de altos (sin suavizar) → chispas en cada hi-hat
+        const alpha = (0.10 + Math.abs(Math.sin(est[b + 5])) * 0.4) + (rawAltos * 0.55);
         ctx.globalAlpha = Math.min(alpha, 1);
-        
-        // Las estrellas se agrandan ligeramente en los bajos pesados (con suavizado)
-        const radioEstrella = est[b + 4] * (1 + s.factorAudioSuave * 1.5);
-        
+
+        // Tamaño: suavizado para que no sea abrupto pero sí notorio
+        const radioEstrella = est[b + 4] * (1 + s.sAltos * 2.0);
         ctx.beginPath();
         ctx.arc(est[b + 0] * W, est[b + 1] * H, radioEstrella, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.globalAlpha = 1;
 
+      ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
       refRaf.current = requestAnimationFrame(bucle);
     };

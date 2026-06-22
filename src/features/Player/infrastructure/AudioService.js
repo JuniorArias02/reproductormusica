@@ -45,11 +45,14 @@ class AudioService {
       const source = this.audioCtx.createMediaElementSource(this.mediaElement);
       this.analyser = this.audioCtx.createAnalyser();
 
-      this.analyser.fftSize = 64; // 32 barras
+      // fftSize 256 = 128 bins. Cada bin ≈ 344Hz (sampleRate 44100 / 256)
+      // Esto nos da resolución suficiente para separar graves, medios y agudos.
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.7; // Suavizado nativo del analizador
       source.connect(this.analyser);
       this.analyser.connect(this.audioCtx.destination);
 
-      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount); // 128 bins
       this.audioIniciado = true;
     } catch (e) {
       console.warn('No se pudo iniciar Web Audio API:', e);
@@ -98,6 +101,47 @@ class AudioService {
       return this.dataArray;
     }
     return null;
+  }
+
+  /**
+   * Retorna 3 valores normalizados (0-1) para cada banda de frecuencia.
+   * Con 128 bins a ~344Hz/bin:
+   *   - bajos:  bins 0-4  → 0 a ~1.7kHz (kick, bombo, bajo)
+   *   - medios: bins 5-20 → ~1.7kHz a ~6.9kHz (voz, guitarra, piano)
+   *   - altos:  bins 21-63 → ~7kHz a ~22kHz (hi-hats, platillos, presencia vocal alta)
+   */
+  getBands() {
+    if (!this.audioIniciado || !this.analyser || !this.dataArray) {
+      return { bajos: 0, medios: 0, altos: 0 };
+    }
+    this.analyser.getByteFrequencyData(this.dataArray);
+    const f = this.dataArray;
+
+    // ── Bajos: pico máximo de los primeros 4 bins (kick, bombo) ─────────
+    let pBajos = 0;
+    for (let i = 0; i < 4; i++) pBajos = Math.max(pBajos, f[i]);
+    // Noise gate: solo reaccionar a golpes reales (>160/255)
+    const bajos = Math.pow(Math.max(0, pBajos - 160) / 95, 2.5);
+
+    // ── Medios: promedio RMS de bins 5-20 (voz, instrumentos melódicos) ─
+    let sumMedios = 0;
+    for (let i = 5; i <= 20; i++) sumMedios += f[i];
+    const avgMedios = sumMedios / 16;
+    // Umbral bajo para que reaccione a voces y cuerdas suaves también
+    const medios = Math.pow(Math.max(0, avgMedios - 80) / 175, 1.5);
+
+    // ── Altos: energía RMS de bins 21-63 (hi-hats, platillos, sibilancia) ─
+    let sumAltos = 0;
+    for (let i = 21; i <= 63; i++) sumAltos += f[i];
+    const avgAltos = sumAltos / 43;
+    // Los agudos suelen ser más silenciosos, umbral muy bajo
+    const altos = Math.pow(Math.max(0, avgAltos - 40) / 215, 1.2);
+
+    return {
+      bajos: Math.min(bajos, 1),
+      medios: Math.min(medios, 1),
+      altos: Math.min(altos, 1),
+    };
   }
 
   // Suscriptores
