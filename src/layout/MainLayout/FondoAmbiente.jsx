@@ -84,20 +84,41 @@ export function FondoAmbiente() {
 
       ctx.clearRect(0, 0, W, H);
       
-      // Sincronización Épica con Audio (Bajos)
-      let factorAudio = 0;
+      // Sincronización Épica y Agresiva con Audio (Física de Altavoz Real)
+      let factorAudioBase = 0;
       if (s.reproduciendo && obtenerFrecuencias) {
         const frecuencias = obtenerFrecuencias();
         if (frecuencias) {
-          // Tomar promedio de graves (primeros 5 valores)
+          // Extraer el "pico" real de graves (primeras 4 bandas)
+          // Usamos Math.max para no diluir el golpe seco del bombo (kick)
           let graves = 0;
-          for (let i = 0; i < 5; i++) graves += frecuencias[i];
-          factorAudio = (graves / 5) / 255; // Rango de 0 a 1
+          for (let i = 0; i < 4; i++) {
+            graves = Math.max(graves, frecuencias[i]);
+          }
+          
+          // Mapeo exponencial: Cortamos el ruido por debajo de 160
+          // El rango útil para impactos es de 160 a 255 (95 de diferencia)
+          let intensidadCruda = Math.max(0, graves - 160) / 95; 
+          
+          // Elevamos a la 3ra potencia. 
+          // Esto apaga los sonidos normales y hace explotar los golpes verdaderos.
+          factorAudioBase = Math.pow(intensidadCruda, 3);
         }
       }
 
-      // El tiempo global avanza más rápido si hay graves fuertes
-      s.t += dt * (1 + factorAudio * 2);
+      // Fast Attack, Slow Decay (Ataque rápido, Caída suave elástica)
+      if (s.factorAudioSuave === undefined) s.factorAudioSuave = 0;
+      
+      if (factorAudioBase > s.factorAudioSuave) {
+         // Ataque brutal: el visualizador reacciona al instante
+         s.factorAudioSuave += (factorAudioBase - s.factorAudioSuave) * 0.85;
+      } else {
+         // Decay (Caída): se desinfla suavemente como la membrana de un altavoz
+         s.factorAudioSuave += (factorAudioBase - s.factorAudioSuave) * 0.08;
+      }
+
+      // El tiempo global avanza hasta 20 VECES MÁS RÁPIDO en el drop
+      s.t += dt * (1 + s.factorAudioSuave * 20);
 
       // Interpolar color suavemente
       s.cr += (s.tr - s.cr) * 0.02;
@@ -105,8 +126,8 @@ export function FondoAmbiente() {
       s.cb += (s.tb - s.cb) * 0.02;
       const R = s.cr | 0, G = s.cg | 0, B = s.cb | 0;
 
-      // El tamaño del "latido" pulsa intensamente con los graves
-      const factorLatido = 1 + (factorAudio * 0.4);
+      // El tamaño base ahora es más pequeño (0.65), pero explota masivamente (+1.85 = 2.5x)
+      const factorLatido = 0.65 + (s.factorAudioSuave * 1.85);
 
       ctx.globalCompositeOperation = 'screen';
       const cx = W * 0.5, cy = H * 0.5;
@@ -143,41 +164,55 @@ export function FondoAmbiente() {
 
       // ── Blobs nebulosos orbitales ────────────────────────────
       s.blobs.forEach((blob) => {
-        blob.angulo += blob.velocidad * dt;
-        blob.faseAlpha += 0.00035 * dt;
+        // Velocidad de rotación aumentada drásticamente en el beat
+        blob.angulo += blob.velocidad * dt * (1 + s.factorAudioSuave * 8);
+        blob.faseAlpha += 0.00035 * dt * (1 + factorAudioBase * 2);
 
         const bx = cx + Math.cos(blob.angulo) * blob.radioOrbit * W;
         const by = cy + Math.sin(blob.angulo * 0.65) * blob.radioOrbit * H * 0.55;
         const radio = blob.tamano * Math.min(W, H) * factorLatido;
-        const alpha = 0.035 + Math.abs(Math.sin(blob.faseAlpha)) * 0.04;
+        
+        // El destello de opacidad usa el Base (sin suavizar) para que flashee como estroboscopio
+        const alpha = (0.035 + Math.abs(Math.sin(blob.faseAlpha)) * 0.04) + (factorAudioBase * 0.45);
 
-        ctx.globalAlpha = alpha * 1.8;
+        ctx.globalAlpha = Math.min(alpha * 1.8, 1);
         ctx.drawImage(s.cacheCanvas, bx - radio, by - radio, radio * 2, radio * 2);
       });
 
-      // Blob cian complementario (se mueve en sentido contrario)
+      // Blob cian complementario reacciona a los altos
       const bCx = cx + Math.cos(s.t * 0.00007) * W * 0.28;
       const bCy = cy + Math.sin(s.t * 0.00004) * H * 0.28;
-      const bCR = Math.min(W, H) * 0.18;
-      ctx.globalAlpha = 0.04;
+      const bCR = Math.min(W, H) * 0.18 * (1 + s.factorAudioSuave * 1.2); 
+      ctx.globalAlpha = 0.04 + (factorAudioBase * 0.25); 
       ctx.drawImage(s.cyanCanvas, bCx - bCR, bCy - bCR, bCR * 2, bCR * 2);
       
-      // ── Campo de estrellas (arcos simples sin gradientes) ─────
+      // ── Campo de estrellas hiperespacial ─────
       const est = s.estrellas;
-      ctx.fillStyle = 'rgba(220,220,240,1)';
+      ctx.fillStyle = 'rgba(255,255,255,1)';
+      
+      // La velocidad del viaje espacial se dispara con el pico crudo
+      const velocidadViaje = 1 + (Math.pow(factorAudioBase, 2) * 50); 
+
       for (let i = 0; i < CANTIDAD_ESTRELLAS; i++) {
         const b = i * 6;
-        est[b + 0] += est[b + 2] * dt;
-        est[b + 1] += est[b + 3] * dt;
-        est[b + 5] += PASO_ESTRELLA;
+        est[b + 0] += est[b + 2] * dt * velocidadViaje;
+        est[b + 1] += est[b + 3] * dt * velocidadViaje;
+        est[b + 5] += PASO_ESTRELLA * (1 + factorAudioBase * 5);
+        
         if (est[b + 1] < 0) { est[b + 1] = 1; est[b + 0] = Math.random(); }
+        if (est[b + 1] > 1) { est[b + 1] = 0; est[b + 0] = Math.random(); }
         if (est[b + 0] < 0) est[b + 0] = 1;
         if (est[b + 0] > 1) est[b + 0] = 0;
 
-        const alpha = 0.15 + Math.abs(Math.sin(est[b + 5])) * 0.55;
-        ctx.globalAlpha = alpha;
+        // Las estrellas brillan intensamente cuando pega el beat
+        const alpha = (0.15 + Math.abs(Math.sin(est[b + 5])) * 0.55) + (factorAudioBase * 0.6);
+        ctx.globalAlpha = Math.min(alpha, 1);
+        
+        // Las estrellas se agrandan ligeramente en los bajos pesados (con suavizado)
+        const radioEstrella = est[b + 4] * (1 + s.factorAudioSuave * 1.5);
+        
         ctx.beginPath();
-        ctx.arc(est[b + 0] * W, est[b + 1] * H, est[b + 4], 0, Math.PI * 2);
+        ctx.arc(est[b + 0] * W, est[b + 1] * H, radioEstrella, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
