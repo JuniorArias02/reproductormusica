@@ -40,53 +40,35 @@ export function PanelNowPlaying({ cancion }) {
 
   return (
     <div
-      className="panel-now-playing relative flex flex-col h-full w-full overflow-hidden"
+      className="panel-now-playing relative flex flex-col h-full w-full overflow-hidden bg-fondo-base"
       style={{ '--color-vivo': hex, '--color-vivo-r': r, '--color-vivo-g': g, '--color-vivo-b': b }}
     >
-      {/* Fondo inmersivo con color dinámico */}
+      {/* Fondo inmersivo suave y elegante (Glassmorphism sutil) */}
       <div
-        className="absolute inset-0 z-0 transition-all duration-1000"
-        style={{ background: `linear-gradient(135deg, rgba(${r},${g},${b},0.18) 0%, #0A0A0C 50%, rgba(0,240,255,0.06) 100%)` }}
-      />
-
-      {/* Blob de color animado arriba */}
-      <div
-        className="absolute -top-20 -right-20 w-80 h-80 rounded-full blur-3xl z-0 transition-all duration-1000 glow-pulse"
-        style={{ background: rgba(0.22) }}
-      />
-
-      {/* Blob de color animado abajo */}
-      <div
-        className="absolute -bottom-20 -left-10 w-60 h-60 rounded-full blur-3xl z-0 transition-all duration-1000"
-        style={{ background: `rgba(0,240,255,0.07)` }}
-      />
-
-      {/* Cuadrícula decorativa */}
-      <div
-        className="absolute inset-0 z-0 opacity-[0.04]"
-        style={{
-          backgroundImage: `linear-gradient(${hex} 1px, transparent 1px), linear-gradient(90deg, ${hex} 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
+        className="absolute inset-0 z-0 transition-all duration-1000 opacity-60"
+        style={{ 
+          background: `radial-gradient(circle at 50% -20%, rgba(${r},${g},${b},0.25) 0%, transparent 60%), 
+                       radial-gradient(circle at 100% 100%, rgba(${r},${g},${b},0.1) 0%, transparent 50%)` 
         }}
       />
 
       {/* Contenido */}
       <div className="relative z-10 flex flex-col items-center justify-between h-full p-8 gap-5 overflow-y-auto custom-scrollbar">
 
-        {/* Cabecera (Etiqueta + Botón Cerrar) */}
-        <div className="text-reveal-1 flex items-center justify-between w-full">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ background: hex, boxShadow: `0 0 8px ${hex}` }} />
-            <span className="text-xs font-bold tracking-[0.3em] uppercase" style={{ color: hex }}>Now Playing</span>
-            <span className="w-16 h-px" style={{ background: `linear-gradient(to right, ${hex}, transparent)` }} />
-          </div>
+        {/* Cabecera Limpia (Estilo Music App Premium) */}
+        <div className="text-reveal-1 flex items-center justify-between w-full relative">
           <button 
             onClick={cerrarPanel}
-            className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors absolute left-0"
             title="Ocultar panel"
           >
-            <ChevronDown size={18} className="text-white/70" />
+            <ChevronDown size={24} className="text-white/70" />
           </button>
+          <div className="w-full text-center pointer-events-none">
+            <span className="text-[11px] font-semibold tracking-widest uppercase text-white/50">
+              Reproduciendo ahora
+            </span>
+          </div>
         </div>
 
         {/* Visual Principal (Pantalla de Video o Disco Vinilo) */}
