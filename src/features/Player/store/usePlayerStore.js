@@ -2,6 +2,37 @@ import { create } from 'zustand';
 import { audioService } from '../infrastructure/AudioService';
 import { extraerMetadatosMP3 } from '../services/extraerMetadatos';
 
+// ─── Utilidad para IndexedDB (Guardar Handle de Carpeta) ───────────────
+const IDB_DB_NAME = 'ReproductorDB';
+const IDB_STORE_NAME = 'handles';
+
+const initDB = () => new Promise((resolve, reject) => {
+  const request = indexedDB.open(IDB_DB_NAME, 1);
+  request.onupgradeneeded = (e) => e.target.result.createObjectStore(IDB_STORE_NAME);
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
+
+const saveHandle = async (handle) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+    tx.objectStore(IDB_STORE_NAME).put(handle, 'musicFolderHandle');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+const getHandle = async () => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE_NAME, 'readonly');
+    const req = tx.objectStore(IDB_STORE_NAME).get('musicFolderHandle');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(tx.error);
+  });
+};
+
 // ─── Leer archivos estáticos (igual que en tu hook anterior) ───────────
 const modulosArchivos = import.meta.glob('../../../assets/media/*.{mp3,mp4}', { eager: true });
 
@@ -231,6 +262,91 @@ export const usePlayerStore = create((set, get) => {
       
       if (nuevasCanciones.length > 0) {
         set((state) => ({ listaCanciones: [...state.listaCanciones, ...nuevasCanciones] }));
+      }
+    },
+
+    // ─── Nuevas funciones para vincular carpeta local (File System Access API) ───
+    vincularCarpetaLocal: async () => {
+      try {
+        if (!('showDirectoryPicker' in window)) {
+          alert('Tu navegador no soporta la vinculación de carpetas. Te recomendamos usar Google Chrome o Microsoft Edge en PC.');
+          return;
+        }
+
+        const handle = await window.showDirectoryPicker({
+          id: 'music-folder',
+          mode: 'read',
+          startIn: 'music'
+        });
+        
+        await saveHandle(handle);
+        await get().cargarDirectorio(handle);
+      } catch (err) {
+        console.error('Error al vincular carpeta o selección cancelada:', err);
+      }
+    },
+
+    restaurarCarpetaVinculada: async () => {
+      try {
+        const handle = await getHandle();
+        if (handle) {
+          // Verificar permiso
+          const options = { mode: 'read' };
+          if ((await handle.queryPermission(options)) !== 'granted') {
+            const permission = await handle.requestPermission(options);
+            if (permission !== 'granted') return;
+          }
+          await get().cargarDirectorio(handle);
+        }
+      } catch (err) {
+        console.error('Error al restaurar la carpeta vinculada:', err);
+      }
+    },
+
+    cargarDirectorio: async (dirHandle) => {
+      const nuevasCanciones = [];
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && (entry.name.endsWith('.mp3') || entry.name.endsWith('.mp4'))) {
+          const file = await entry.getFile();
+          
+          const objectUrl = URL.createObjectURL(file);
+          const esVideo = file.type.startsWith('video/') || entry.name.endsWith('.mp4');
+          const id = `local_dir_${entry.name}`;
+          
+          let portada = null;
+          let artista = 'Artista Desconocido';
+          let titulo = file.name.replace(/\.[^/.]+$/, "");
+          let duracion = 0;
+          
+          if (!esVideo) {
+            try {
+              const meta = await extraerMetadatosMP3(objectUrl, titulo);
+              portada = meta.portada;
+              if (meta.artista !== 'Artista Local') artista = meta.artista;
+              if (meta.tituloMetadatos) titulo = meta.tituloMetadatos;
+              duracion = meta.duracion || 0;
+            } catch(e) {}
+          } else {
+            duracion = await new Promise(resolve => {
+              const v = document.createElement('video');
+              v.src = objectUrl;
+              v.onloadedmetadata = () => resolve(v.duration);
+              v.onerror = () => resolve(0);
+            });
+          }
+          
+          nuevasCanciones.push({
+            id, titulo, artista, portada, archivo: objectUrl, esVideo, duracion
+          });
+        }
+      }
+      
+      if (nuevasCanciones.length > 0) {
+        set((state) => {
+          const idsExistentes = new Set(state.listaCanciones.map(c => c.id));
+          const cancionesFiltradas = nuevasCanciones.filter(c => !idsExistentes.has(c.id));
+          return { listaCanciones: [...state.listaCanciones, ...cancionesFiltradas] };
+        });
       }
     }
   };

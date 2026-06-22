@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { useReproductor } from '../../Player/context/ContextoReproductor';
-import { Play, Pause, Heart, Clock, Music, Film } from 'lucide-react';
+import { Play, Pause, Heart, Clock, Music, Film, FolderSync } from 'lucide-react';
 import { cn } from '../../../utils/clases';
 import { formatearTiempo } from '../../Player/utils/formatoTiempo';
 
@@ -13,8 +14,14 @@ export function Libreria() {
     color, 
     estaEnLiked, 
     alternarLike,
-    importarCancionesLocales
+    importarCancionesLocales,
+    vincularCarpetaLocal,
+    restaurarCarpetaVinculada
   } = useReproductor();
+
+  useEffect(() => {
+    restaurarCarpetaVinculada();
+  }, [restaurarCarpetaVinculada]);
 
   const colorHex = color?.hex ?? '#FF4A1C';
   const colorR = color?.r ?? 255;
@@ -45,25 +52,38 @@ export function Libreria() {
               <span className="text-white">{listaCanciones?.length || 0} canciones</span> locales
             </p>
 
-            <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all">
-              <div className="w-6 h-6 rounded-full bg-acento-primario flex items-center justify-center text-white">
-                <Music size={12} />
-              </div>
-              <span className="text-sm font-semibold text-white">Importar archivos</span>
-              <input 
-                type="file" 
-                multiple 
-                accept="audio/*,video/mp4" 
-                className="hidden" 
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    importarCancionesLocales(Array.from(e.target.files));
-                    // Limpiar el input para permitir volver a subir el mismo archivo si es necesario
-                    e.target.value = '';
-                  }
-                }}
-              />
-            </label>
+            <div className="flex gap-3">
+              <button 
+                onClick={vincularCarpetaLocal}
+                className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all"
+                title="Sincroniza una carpeta de tu PC para reproducir música sin subirla."
+              >
+                <div className="w-6 h-6 rounded-full bg-acento-primario flex items-center justify-center text-white" style={{ backgroundColor: colorHex }}>
+                  <FolderSync size={12} />
+                </div>
+                <span className="text-sm font-semibold text-white">Vincular carpeta</span>
+              </button>
+
+              <label className="cursor-pointer group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all">
+                <div className="w-6 h-6 rounded-full bg-acento-primario flex items-center justify-center text-white" style={{ backgroundColor: colorHex }}>
+                  <Music size={12} />
+                </div>
+                <span className="text-sm font-semibold text-white">Importar archivos</span>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="audio/*,video/mp4" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      importarCancionesLocales(Array.from(e.target.files));
+                      // Limpiar el input para permitir volver a subir el mismo archivo si es necesario
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </div>
       </div>
