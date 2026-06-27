@@ -30,6 +30,33 @@ export function fireSparks(s, cx, cy, count) {
   }
 }
 
+/** Dispara un mini-anillo de energía en la posición del blob */
+export function fireBlobRing(s, x, y, intensity, colorType) {
+  const ring = s.blobRings.find(r => !r.on);
+  if (!ring) return;
+  ring.on    = true;
+  ring.x     = x;
+  ring.y     = y;
+  ring.r     = 0;
+  ring.maxR  = 40 + intensity * 180;
+  ring.a     = 0.5 + intensity * 0.5;
+  ring.color = colorType; // 'warm' | 'cool'
+}
+
+/** Dispara un burst de luz elegante desde el borde de la pantalla */
+export function fireEdgeBolt(s, W, H, intensity) {
+  const bolt = s.edgeBolts.find(b => !b.on);
+  if (!bolt) return;
+  bolt.on   = true;
+  bolt.edge = Math.floor(Math.random() * 4);
+  bolt.pos  = Math.random();
+  // len = radio máximo de expansión del burst (más grande en drops/kicks intensos)
+  bolt.len  = (0.12 + intensity * 0.30) * Math.min(W, H);
+  bolt.a    = 0.55 + intensity * 0.45; // alpha máximo del burst
+  bolt.life = 1.0;
+  bolt.r    = 0; // radio actual (se calcula en el render)
+}
+
 export function updatePhysics(s, dt, obtenerBandas, W, H, cx, cy) {
   let rSub = 0, rKick = 0, rLow = 0, rMid = 0, rPre = 0, rAir = 0;
   if (s.playing && obtenerBandas) {
@@ -58,6 +85,9 @@ export function updatePhysics(s, dt, obtenerBandas, W, H, cx, cy) {
     fireShockwave(s, W);
     fireSparks(s, cx, cy, 8);
     s.vigAlpha = Math.min(0.8, rKick * 0.9);
+    // Dispara rayos desde los bordes en cada kick fuerte
+    const numBolts = 1 + Math.floor(rKick * 3);
+    for (let i = 0; i < numBolts; i++) fireEdgeBolt(s, W, H, rKick);
   }
   s.prevKick = rKick;
 
@@ -95,6 +125,28 @@ export function updatePhysics(s, dt, obtenerBandas, W, H, cx, cy) {
   s.cr += (s.tr - s.cr) * 0.018;
   s.cg += (s.tg - s.cg) * 0.018;
   s.cb += (s.tb - s.cb) * 0.018;
+
+  // ── Drop: rayos continuos en los bordes mientras el drop está activo ──
+  if (s.dropActivo && Math.random() < s.dropIntensidad * 0.25) {
+    fireEdgeBolt(s, W, H, s.dropIntensidad);
+  }
+
+  // ── Sub-bass muy fuerte: dispara blob rings en posiciones de blobs ──
+  const dEnergy = s.energiaGlobal - s.prevEnergy;
+  s.prevEnergy = s.energiaGlobal;
+  if (dEnergy > 0.05 && s.energiaGlobal > 0.3) {
+    // Ring en un blob calido aleatorio
+    const wb = s.blobsWarm[Math.floor(Math.random() * s.blobsWarm.length)];
+    const wbx = cx + Math.cos(wb.a) * wb.orb * W;
+    const wby = cy + Math.sin(wb.a * 0.7) * wb.orb * H * 0.55;
+    fireBlobRing(s, wbx, wby, s.energiaGlobal, 'warm');
+
+    // Ring en un blob frío aleatorio
+    const cb2 = s.blobsCool[Math.floor(Math.random() * s.blobsCool.length)];
+    const cbx = cx + Math.cos(cb2.a) * cb2.orb * W;
+    const cby = cy + Math.sin(cb2.a * 0.6) * cb2.orb * H * 0.55;
+    fireBlobRing(s, cbx, cby, s.energiaGlobal, 'cool');
+  }
 }
 
 export function updateTextureCache(s, R, G, B) {

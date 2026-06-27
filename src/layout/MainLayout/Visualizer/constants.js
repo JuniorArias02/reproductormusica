@@ -1,9 +1,11 @@
-export const N_STARS      = 150;
-export const N_SPARKS     = 80;
-export const N_BLOBS_WARM = 3;
-export const N_BLOBS_COOL = 3;
-export const N_SHOCKWAVES = 8;
-export const BEAT_HISTORY = 43;
+export const N_STARS        = 150;
+export const N_SPARKS       = 80;
+export const N_BLOBS_WARM   = 3;
+export const N_BLOBS_COOL   = 3;
+export const N_SHOCKWAVES   = 8;
+export const N_BLOB_RINGS   = 24; // anillos de energía locales por blob (pool compartido)
+export const N_EDGE_BOLTS   = 12; // rayos en los bordes de pantalla
+export const BEAT_HISTORY   = 43;
 
 export const ENV = {
   subBass:  [0.90, 0.05],

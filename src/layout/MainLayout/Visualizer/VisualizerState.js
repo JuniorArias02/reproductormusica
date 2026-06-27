@@ -1,4 +1,4 @@
-import { N_STARS, N_SPARKS, N_BLOBS_WARM, N_BLOBS_COOL, N_SHOCKWAVES, BEAT_HISTORY } from './constants';
+import { N_STARS, N_SPARKS, N_BLOBS_WARM, N_BLOBS_COOL, N_SHOCKWAVES, N_BLOB_RINGS, N_EDGE_BOLTS, BEAT_HISTORY } from './constants';
 
 export function createVisualizerState() {
   const stars = new Float32Array(N_STARS * 6);
@@ -36,10 +36,26 @@ export function createVisualizerState() {
     on: false, r: 0, maxR: 0, a: 0,
   }));
 
+  // Anillos de energía por blob (mini shockwaves locales en la posición del blob)
+  const blobRings = Array.from({ length: N_BLOB_RINGS }, () => ({
+    on: false, x: 0, y: 0, r: 0, maxR: 0, a: 0, color: 'warm',
+  }));
+
+  // Rayos/flash en los bordes de pantalla (drop & bass fuerte)
+  const edgeBolts = Array.from({ length: N_EDGE_BOLTS }, () => ({
+    on: false,
+    edge: 0,      // 0=top 1=right 2=bottom 3=left
+    pos: 0,       // posición relativa 0..1 a lo largo del borde
+    len: 0,       // radio máximo de expansión del burst (px)
+    r: 0,         // radio actual
+    a: 0,         // alpha actual
+    life: 0,
+  }));
+
   const beatHistory = new Float32Array(BEAT_HISTORY);
 
   return {
-    stars, sparks, blobsWarm, blobsCool, shockwaves, beatHistory,
+    stars, sparks, blobsWarm, blobsCool, shockwaves, blobRings, edgeBolts, beatHistory,
     beatPtr: 0,
     cr: 255, cg: 74, cb: 28,
     tr: 255, tg: 74, tb: 28,
@@ -53,6 +69,8 @@ export function createVisualizerState() {
     energiaGlobal: 0, energiaLenta:  0,
     dropScore: 0, dropActivo: false, dropIntensidad: 0,
     pulse: 0,
-    camScale: 1, // Escala de cámara para efecto Zoom Bop
+    camScale: 1,   // Escala de cámara para efecto Zoom Bop
+    energyPeak: 0, // pico de energía instantaneo para disparar efectos de borde
+    prevEnergy: 0, // energía anterior (detección de picos)
   };
 }
