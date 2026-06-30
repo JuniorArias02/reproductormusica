@@ -14,33 +14,37 @@ export function renderScreenEdgeLayer(ctx, s, W, H, cx, cy, dt, R, G, B) {
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
 
-  // ── 1. Halo de borde continuo (drop/pulse) ─────────────────────────────
-  const glowIntensity = s.dropIntensidad * 0.60 + s.pulse * 0.22 + s.eSubBass * 0.18;
-  if (glowIntensity > 0.015) {
-    _drawContinuousEdgeHalo(ctx, W, H, glowIntensity, R, G, B);
+  const tc = s.tempoChar   ?? 0.5; // 0=lento, 1=rápido
+  const rb = s.tempoRebote ?? 0;   // rebote del beat
+
+  // ── 1. Halo continuo de borde ─────────────────────────────────────────
+  // Lento: halo ancho y etéreo | Rápido: halo estrecho y pulsante
+  const glowBase = s.dropIntensidad * 0.55 + s.eSubBass * 0.18;
+  const glowBeat = rb * (0.12 - tc * 0.06); // el rebote vale más en canciones lentas
+  const glowIntensity = glowBase + glowBeat;
+  if (glowIntensity > 0.012) {
+    _drawContinuousEdgeHalo(ctx, W, H, glowIntensity, tc, R, G, B);
   }
 
-  // ── 2. Explosiones individuales de borde (edgeBolts reutilizados) ──────
+  // ── 2. Explosiones individuales de borde ─────────────────────────────
+  // Velocidad de decaimiento: rápido en tempo alto (bursts más cortos y snappy)
+  const boltDecay = dt * (0.005 + tc * 0.006);
   for (const bolt of s.edgeBolts) {
     if (!bolt.on) continue;
-
-    // Cada "bolt" es ahora un burst radial. life decae con dt.
-    bolt.life -= dt * 0.006;
+    bolt.life -= boltDecay;
     if (bolt.life <= 0) { bolt.on = false; continue; }
-
-    // Fase de expansión rápida al inicio, luego se suaviza
     bolt.r = (1 - bolt.life) * bolt.len;
-
     _drawEdgeBurst(ctx, bolt, W, H, R, G, B);
   }
 
   ctx.restore();
 }
 
-// ── Helper: halo suave en los 4 bordes ─────────────────────────────────────
-function _drawContinuousEdgeHalo(ctx, W, H, intensity, R, G, B) {
-  const depth  = Math.min(W, H) * (0.10 + intensity * 0.22);
-  const alpha  = Math.min(intensity * 0.50, 0.45);
+// ── Helper: halo suave en los 4 bordes ──────────────────────────────────────────
+function _drawContinuousEdgeHalo(ctx, W, H, intensity, tc, R, G, B) {
+  // Lento (tc=0): halo más profundo y etéren | Rápido (tc=1): más estrecho
+  const depth  = Math.min(W, H) * (0.08 + intensity * 0.20 + (1 - tc) * 0.06);
+  const alpha  = Math.min(intensity * 0.45, 0.40);
 
   // Cada borde usa un gradiente lineal perpendicular al borde
   const edges = [
@@ -120,7 +124,7 @@ function _drawEdgeBurst(ctx, bolt, W, H, R, G, B) {
   ctx.arc(bx, by, curR, 0, Math.PI * 2);
   ctx.fill();
 
-  // ── Capa 3: corona exterior fantasma (el "bloom blur" que se disipa) ──
+  // ── Capa 3: corona exterior fantasma (el "bloom blur") ──
   const outerR = curR * 1.55;
   const outerA = burstAlpha * 0.18 * bolt.life;
   if (outerA > 0.005) {
@@ -134,7 +138,7 @@ function _drawEdgeBurst(ctx, bolt, W, H, R, G, B) {
   }
 
   // ── Capa 4: partícula central fija (punto de ignición en el borde) ──
-  // Solo al inicio del burst (life > 0.65), hace que parezca que "nace" del borde
+  //inicio del burst (life > 0.65), hace que "nace" del borde
   if (bolt.life > 0.50) {
     const sparkA  = (bolt.life - 0.50) * 2 * burstAlpha;
     const sparkR  = innerR * 0.35;

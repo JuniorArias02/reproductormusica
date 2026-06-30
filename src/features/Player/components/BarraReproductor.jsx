@@ -32,6 +32,8 @@ export function BarraReproductor() {
     panelExpandido,
     abrirPanel,
     cerrarPanel,
+    analizandoIA,
+    mapaMusical
   } = useReproductor();
 
   const R = color?.r ?? 255, G = color?.g ?? 74, B = color?.b ?? 28;
@@ -107,7 +109,20 @@ export function BarraReproductor() {
                   <span className="text-sm font-semibold text-texto-principal truncate leading-tight group-hover:underline decoration-white/30">
                     {cancionActual.titulo}
                   </span>
-                  <span className="text-xs text-texto-secundario truncate">{cancionActual.artista}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-texto-secundario truncate">{cancionActual.artista}</span>
+                    {/* Indicador IA */}
+                    {(analizandoIA || mapaMusical) && (
+                      <span className={cn(
+                        "text-[9px] px-1.5 py-0.5 rounded-full font-bold border transition-colors",
+                        analizandoIA 
+                          ? "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse"
+                          : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      )} title={analizandoIA ? "AI Analizando..." : "Audio sincronizado con AI (JSON)"}>
+                        {analizandoIA ? 'AI SCAN' : 'AI SYNC'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
 

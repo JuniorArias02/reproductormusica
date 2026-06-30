@@ -80,6 +80,8 @@ export const usePlayerStore = create((set, get) => {
     duracion: 0,
     volumen: volumenInicial,
     cancionActual: null,
+    mapaMusical: null,      // JSON con drops, beats, onsets y vocals devuelto por Node.js
+    analizandoIA: false,    // Indicador visual si Python está procesando
     mezclando: false,
     repitiendo: false,
     listaLiked: likedInicial,
@@ -92,9 +94,34 @@ export const usePlayerStore = create((set, get) => {
     cerrarPanel: () => set({ panelExpandido: false }),
     alternarSidebar: () => set((state) => ({ sidebarExpandido: !state.sidebarExpandido })),
 
-    cargarCancion: (cancion) => {
+    cargarCancion: async (cancion) => {
+      // Detenemos la reproducción anterior y mostramos que estamos analizando
+      audioService.pause();
+      set({ cancionActual: cancion, estaReproduciendo: false, progreso: 0, mapaMusical: null, analizandoIA: true });
+
+      // Hacer petición al JSON estático local (precalculado)
+      try {
+        const filename = encodeURIComponent(cancion.titulo + '.json');
+        console.log(`[AI] Buscando mapa musical estático → /mapas/${filename}`);
+        
+        const response = await fetch(`/mapas/${filename}`);
+        
+        if (response.ok) {
+          const mapa = await response.json();
+          set({ mapaMusical: mapa, analizandoIA: false });
+          console.log(`[AI] Mapa Musical cargado exitosamente para: ${cancion.titulo}`);
+        } else {
+          set({ analizandoIA: false });
+          console.warn(`[AI] No hay JSON precalculado para ${cancion.titulo}. Reproduciendo en modo normal (Fallback).`);
+        }
+      } catch (err) {
+        set({ analizandoIA: false });
+        console.warn("[AI] Error al intentar leer el JSON local.");
+      }
+
+      // ── Una vez que la IA termine (con éxito o error), RECIÉN reproducimos el audio ──
       audioService.play(cancion.archivo);
-      set({ cancionActual: cancion, estaReproduciendo: true, progreso: 0 });
+      set({ estaReproduciendo: true });
     },
 
     reproducir: () => {

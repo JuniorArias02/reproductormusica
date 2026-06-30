@@ -1,10 +1,11 @@
 export const N_STARS        = 150;
 export const N_SPARKS       = 80;
-export const N_BLOBS_WARM   = 3;
-export const N_BLOBS_COOL   = 3;
+export const N_BLOBS_WARM   = 4;   // sincronizados con bajo/batería
+export const N_BLOBS_COOL   = 4;   // sincronizados con voz/melodía
+export const N_BLOBS_INSTR  = 3;   // sincronizados con instrumentos (onsets)
 export const N_SHOCKWAVES   = 8;
-export const N_BLOB_RINGS   = 24; // anillos de energía locales por blob (pool compartido)
-export const N_EDGE_BOLTS   = 12; // rayos en los bordes de pantalla
+export const N_BLOB_RINGS   = 64;
+export const N_EDGE_BOLTS   = 12;
 export const BEAT_HISTORY   = 43;
 
 export const ENV = {

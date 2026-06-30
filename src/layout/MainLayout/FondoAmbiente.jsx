@@ -3,17 +3,21 @@ import { useReproductor } from '../../features/Player/context/ContextoReproducto
 import { createVisualizerState } from './Visualizer/VisualizerState';
 import { updatePhysics, updateTextureCache } from './Visualizer/VisualizerPhysics';
 import { activeLayers } from './Visualizer/layers';
+import { useAudioSync } from '../../features/Player/hooks/useAudioSync';
 
 /**
  * Contenedor React del Motor audiovisual 6-Band v4 (Arquitectura Limpia).
  * Ahora la lógica y las capas están modularizadas en /Visualizer/
  */
 export function FondoAmbiente() {
-  const { color, estaReproduciendo, obtenerBandas } = useReproductor();
+  const { color, estaReproduciendo, obtenerBandas, refElemento, mapaMusical, analizandoIA } = useReproductor();
   const refCanvas   = useRef(null);
   const refRaf      = useRef(null);
   const refVignette = useRef(null);
   const S           = useRef(null); // Estado mutable centralizado
+
+  // Hook que sincroniza el audio con el JSON precalculado (si existe)
+  const syncState = useAudioSync(refElemento, mapaMusical);
 
   // Inicializar estado una sola vez
   if (!S.current) {
@@ -61,7 +65,9 @@ export function FondoAmbiente() {
         ctx.clearRect(0, 0, W, H);
 
         // ── 1. Física, Audio y Envelopes ──
-        updatePhysics(s, dt, obtenerBandas, W, H, cx, cy);
+        // Si tenemos JSON de la IA, le pasamos los triggers a las físicas nativas
+        const iaSync = (mapaMusical && syncState.current) ? syncState.current : null;
+        updatePhysics(s, dt, obtenerBandas, W, H, cx, cy, iaSync);
         
         // Color base suave (para caché de blobs, evita recálculo excesivo)
         const baseR = s.cr | 0, baseG = s.cg | 0, baseB = s.cb | 0;

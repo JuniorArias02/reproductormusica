@@ -11,20 +11,41 @@ export function Inmersivo() {
     );
   }
 
-  const { hex } = color || { hex: '#FF4A1C' };
+  const handleMouseMove = (e) => {
+    window.__VISUALIZER_MOUSE__ = window.__VISUALIZER_MOUSE__ || {};
+    window.__VISUALIZER_MOUSE__.x = e.clientX;
+    window.__VISUALIZER_MOUSE__.y = e.clientY;
+    window.__VISUALIZER_MOUSE__.active = true;
+  };
+
+  const handleMouseDown = (e) => {
+    window.__VISUALIZER_MOUSE__ = window.__VISUALIZER_MOUSE__ || {};
+    window.__VISUALIZER_MOUSE__.x = e.clientX;
+    window.__VISUALIZER_MOUSE__.y = e.clientY;
+    window.__VISUALIZER_MOUSE__.down = true;
+  };
+
+  const handleMouseUp = (e) => {
+    window.__VISUALIZER_MOUSE__ = window.__VISUALIZER_MOUSE__ || {};
+    window.__VISUALIZER_MOUSE__.down = false;
+    window.__VISUALIZER_MOUSE__.release = true;
+  };
+
+  const handleMouseLeave = () => {
+    if (window.__VISUALIZER_MOUSE__) {
+      window.__VISUALIZER_MOUSE__.active = false;
+      window.__VISUALIZER_MOUSE__.down = false;
+      window.__VISUALIZER_MOUSE__.release = true; // Trigger if they leave while holding
+    }
+  };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center relative z-10 p-12">
-      {/* Esta vista está vacía intencionalmente para disfrutar del FondoAmbiente sincronizado. */}
-      {/* Solo agregamos un sutil título flotante de la canción en el centro */}
-      <div className="text-center mt-auto mb-16 opacity-70 hover:opacity-100 transition-opacity duration-700">
-        <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tighter mb-2" style={{ textShadow: `0 0 40px ${hex}` }}>
-          {cancionActual.titulo}
-        </h2>
-        <p className="text-lg md:text-2xl text-white/60 tracking-wide font-light">
-          {cancionActual.artista}
-        </p>
-      </div>
-    </div>
+    <div 
+      className="w-full h-full cursor-crosshair" 
+      onMouseMove={handleMouseMove}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+    />
   );
-}
+} 

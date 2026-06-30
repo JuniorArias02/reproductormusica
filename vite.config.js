@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    cors: true,
     watch: {
       ignored: ['**/src/assets/media/**'] // Evita que la app de React colapse (pantalla negra) al descargar música
     }
